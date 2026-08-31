@@ -223,14 +223,21 @@ class SessionManager {
     let user = null;
     if (targetUserId) {
       user = this.users.find(u => u.id === targetUserId || u.name.toLowerCase() === String(targetUserId).toLowerCase());
-      if (!user || String(user.pin).trim() !== pin) {
-        return { success: false, message: 'Incorrect 4-digit PIN for selected staff member.' };
+      if (user && String(user.pin).trim() === pin) {
+        return this.setAuthenticatedUser(user);
       }
+      // Smart Auto-Recognition: If PIN belongs to another operator (e.g. Admin PIN 1234), log in as that operator
+      const matchingUser = this.users.find(u => String(u.pin).trim() === pin);
+      if (matchingUser) {
+        return this.setAuthenticatedUser(matchingUser);
+      }
+      return { success: false, message: 'Incorrect 4-digit PIN.' };
     } else {
       user = this.users.find(u => String(u.pin).trim() === pin);
       if (!user) {
         return { success: false, message: 'Invalid 4-digit staff PIN code.' };
       }
+      return this.setAuthenticatedUser(user);
     }
     return this.setAuthenticatedUser(user);
   }

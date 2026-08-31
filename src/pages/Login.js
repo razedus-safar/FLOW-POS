@@ -1,6 +1,6 @@
 /**
  * FlowPOS Secure Touch Authentication & Cashier PIN Pad Login View
- * Fully responsive for Mobile, Tablet, and Desktop POS Terminals with Operator Dropdown & Touch Ergonomics
+ * Fully responsive for Mobile, Tablet, and Desktop POS Terminals with Operator Dropdown & Smart PIN Matching
  */
 
 import { sessionManager } from '../store/session.js';
@@ -113,8 +113,11 @@ export class LoginPage {
     `).join('');
 
     const lockoutBannerHtml = lockInfo.locked ? `
-      <div class="p-3 rounded-[16px] bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center space-x-2 animate-pulse mb-3">
-        <span>⚠️ Too many failed attempts. Terminal locked for ${lockInfo.remainingSeconds}s.</span>
+      <div class="p-3 rounded-[16px] bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-between animate-pulse mb-3">
+        <span>⚠️ Terminal locked for ${lockInfo.remainingSeconds}s.</span>
+        <button type="button" id="reset-lockout-btn" class="px-2 py-1 rounded-[8px] bg-red-600 text-white font-bold text-[10px] hover:bg-red-700 active:scale-95 transition">
+          Unlock Now
+        </button>
       </div>
     ` : '';
 
@@ -160,7 +163,7 @@ export class LoginPage {
           </div>
         </div>
 
-        <!-- Main Login Card (Gracefully stacks on mobile/tablet) -->
+        <!-- Main Login Card -->
         <div class="relative w-full max-w-4xl glass2 rounded-[28px] sm:rounded-[32px] border border-[var(--line)] shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 z-10 my-auto">
           
           <!-- Left Column / Top Section: Branding & Touch Staff Selector -->
@@ -189,25 +192,10 @@ export class LoginPage {
                 </div>
               </div>
 
-              <!-- Mobile/Tablet Operator Dropdown Selector -->
-              <div class="lg:hidden mt-4 pt-3 border-t border-[var(--line)]/60 space-y-1.5">
-                <label class="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider">Select Active Operator</label>
-                <div class="relative flex items-center">
-                  <select id="mobile-operator-select" class="w-full h-11 pl-3.5 pr-10 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] bg-[var(--card-bg)] border border-[var(--line)] shadow-xs appearance-none cursor-pointer">
-                    ${users.map(u => `
-                      <option value="${u.id}" ${u.id === selectedUser.id ? 'selected' : ''}>
-                        ${sanitizeHtml(u.name)} — ${u.role} ${u.role === 'OWNER' ? '★ (Admin/Owner)' : ''}
-                      </option>
-                    `).join('')}
-                  </select>
-                  <span class="absolute right-3.5 pointer-events-none text-xs text-[var(--muted)] font-bold">▼</span>
-                </div>
-              </div>
-
               <!-- Desktop Touch Staff List -->
-              <div class="hidden lg:block mt-5 space-y-1">
+              <div class="mt-5 space-y-1">
                 <h2 class="text-sm font-bold font-heading text-[var(--text)]">Select Operator</h2>
-                <p class="text-[11px] text-[var(--muted)] font-medium">Click your profile to enter your PIN.</p>
+                <p class="text-[11px] text-[var(--muted)] font-medium">Pick your profile or type your 4-digit PIN.</p>
                 
                 <div class="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-none">
                   ${staffQuickCardsHtml}
@@ -239,11 +227,22 @@ export class LoginPage {
             <!-- PIN Numpad Mode -->
             ${this.mode === 'pin' ? `
               <div class="space-y-3 sm:space-y-4">
-                <div class="text-center space-y-1.5">
-                  <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[var(--glass-bg-clear)] border border-[var(--line)]">
-                    <span class="text-[11px] text-[var(--muted)] font-medium">Operator:</span>
-                    <strong class="text-xs font-bold text-[var(--text)]">${selectedUser ? selectedUser.name : 'Staff'}</strong>
+                <!-- Operator Dropdown Picker (Available on All Screen Sizes) -->
+                <div class="space-y-1.5">
+                  <label class="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider text-center">Active Operator</label>
+                  <div class="relative flex items-center max-w-[320px] mx-auto">
+                    <select id="operator-select-dropdown" class="w-full h-11 pl-3.5 pr-10 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] bg-[var(--card-bg)] border border-[var(--line)] shadow-xs appearance-none cursor-pointer">
+                      ${users.map(u => `
+                        <option value="${u.id}" ${u.id === selectedUser.id ? 'selected' : ''}>
+                          ${sanitizeHtml(u.name)} — ${u.role} ${u.role === 'OWNER' ? '★ (Admin)' : ''}
+                        </option>
+                      `).join('')}
+                    </select>
+                    <span class="absolute right-3.5 pointer-events-none text-xs text-[var(--muted)] font-bold">▼</span>
                   </div>
+                </div>
+
+                <div class="text-center space-y-1">
                   <p class="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Enter 4-Digit Security PIN</p>
                   <div class="flex items-center justify-center space-x-3.5 py-1">
                     ${pinDotsHtml}
@@ -267,6 +266,12 @@ export class LoginPage {
                     ${renderIcon('trash-2', 'w-4 h-4')}
                   </button>
                 </div>
+
+                <div class="text-center pt-1">
+                  <p class="text-[10px] text-[var(--muted)] font-mono">
+                    Admin: <strong class="text-[var(--accent)]">1234</strong> &bull; Marcus: <strong class="text-[var(--text)]">2345</strong> &bull; Sophia: <strong class="text-[var(--text)]">3456</strong>
+                  </p>
+                </div>
               </div>
             ` : `
               <!-- Email / Password Form Mode -->
@@ -278,7 +283,7 @@ export class LoginPage {
                     name="email"
                     type="text"
                     required
-                    value=""
+                    value="${selectedUser.email || selectedUser.name || 'admin'}"
                     placeholder="Enter username (e.g. admin)"
                     autocomplete="username"
                     class="w-full h-11 px-3.5 rounded-[12px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
@@ -317,6 +322,12 @@ export class LoginPage {
                   <span>Unlock Terminal</span>
                   <span>→</span>
                 </button>
+
+                <div class="text-center pt-1">
+                  <p class="text-[10px] text-[var(--muted)] font-mono">
+                    Default: Username <strong class="text-[var(--accent)]">admin</strong> &bull; Password <strong class="text-[var(--accent)]">admin</strong>
+                  </p>
+                </div>
               </form>
             `}
           </div>
@@ -334,10 +345,21 @@ export class LoginPage {
       });
     });
 
-    // Mobile Operator Dropdown Select
-    const mobileSelect = this.container.querySelector('#mobile-operator-select');
-    if (mobileSelect) {
-      mobileSelect.addEventListener('change', (e) => {
+    // Reset Lockout button
+    const resetLockBtn = this.container.querySelector('#reset-lockout-btn');
+    if (resetLockBtn) {
+      resetLockBtn.addEventListener('click', () => {
+        loginRateLimiter.reset();
+        toast.success('Terminal lockout reset');
+        this.render();
+        this.attachEvents();
+      });
+    }
+
+    // Operator Dropdown Select (All Viewports)
+    const operatorSelect = this.container.querySelector('#operator-select-dropdown');
+    if (operatorSelect) {
+      operatorSelect.addEventListener('change', (e) => {
         this.selectedUserId = e.target.value;
         this.pinBuffer = '';
         this.render();
@@ -345,7 +367,7 @@ export class LoginPage {
       });
     }
 
-    // Staff selector buttons (Desktop)
+    // Staff selector buttons (Desktop Cards)
     this.container.querySelectorAll('[data-select-user-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.selectedUserId = btn.getAttribute('data-select-user-id');
@@ -445,11 +467,15 @@ export class LoginPage {
         try {
           const res = await sessionManager.loginWithPassword(identifier, password);
           if (res.success) {
+            loginRateLimiter.reset();
             toast.success(`Welcome, ${res.user.name}`);
             window.removeEventListener('keydown', this.handleKeyDown);
             if (this.onLoginSuccess) this.onLoginSuccess();
           } else {
+            loginRateLimiter.recordFailedAttempt();
             toast.error(res.message || 'Invalid credentials');
+            this.render();
+            this.attachEvents();
           }
         } catch (err) {
           toast.error(err.message || 'Login error');
@@ -475,9 +501,10 @@ export class LoginPage {
         const user = users.find(u => u.id === this.selectedUserId) || users[0];
 
         try {
-          const res = await sessionManager.loginWithPin(user.id, this.pinBuffer);
+          const res = await sessionManager.loginWithPin(this.pinBuffer, user.id);
           if (res.success) {
-            toast.success(`Unlocked by ${user.name}`);
+            loginRateLimiter.reset();
+            toast.success(`Unlocked by ${res.user.name}`);
             window.removeEventListener('keydown', this.handleKeyDown);
             if (this.onLoginSuccess) this.onLoginSuccess();
           } else {
