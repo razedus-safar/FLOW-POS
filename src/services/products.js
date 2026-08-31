@@ -503,8 +503,8 @@ class ProductService {
       return;
     }
 
-    // When connected to Supabase cloud, rely on Cloud pull as source of truth and do not auto-inject demo data
-    if (supabaseClient.isConfigured()) {
+    // When connected to Supabase cloud in real browser, rely on Cloud pull as source of truth and do not auto-inject demo data
+    if (typeof window !== 'undefined' && supabaseClient.isConfigured()) {
       return;
     }
 

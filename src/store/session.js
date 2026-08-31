@@ -140,6 +140,7 @@ class SessionManager {
       list.unshift(DEFAULT_USERS[0]);
     }
 
+    this.users = list;
     return list;
   }
 
