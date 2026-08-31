@@ -3,6 +3,7 @@
  */
 
 import { globalStore } from './state.js';
+import { customerDisplayService } from '../services/customerDisplay.js';
 
 class CartStore {
   constructor() {
@@ -183,18 +184,22 @@ class CartStore {
     };
   }
 
-  notify() {
-    const totals = this.getTotals();
-    const payload = {
+  getCart() {
+    return {
       items: this.items,
       customer: this.customer,
       discount: this.discount,
       taxRate: this.taxRate,
       orderNotes: this.orderNotes,
-      totals,
+      totals: this.getTotals(),
       suspendedCarts: this.suspendedCarts
     };
+  }
+
+  notify() {
+    const payload = this.getCart();
     globalStore.set('cart', payload);
+    customerDisplayService.broadcast('CART_UPDATED', payload);
   }
 }
 

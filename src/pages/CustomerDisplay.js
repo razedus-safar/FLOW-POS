@@ -8,11 +8,12 @@ import { customerDisplayService } from '../services/customerDisplay.js';
 import { formatCurrency } from '../utils/currency.js';
 import { renderIcon } from '../utils/icons.js';
 import { cartStore } from '../store/cart.js';
+import { globalStore } from '../store/state.js';
 
 export class CustomerDisplayPage {
   constructor(container) {
     this.container = container;
-    this.cartData = cartStore.getCart();
+    this.cartData = customerDisplayService.getLatestCart() || globalStore.get('cart') || cartStore.getCart();
     this.unsubscribe = null;
     this.unsubscribeCart = null;
     this.init();
@@ -31,10 +32,12 @@ export class CustomerDisplayPage {
       }
     });
 
-    // Also listen locally to cart store
-    this.unsubscribeCart = cartStore.subscribe((state) => {
-      this.cartData = state;
-      this.render();
+    // Listen to real-time global cart store
+    this.unsubscribeCart = globalStore.subscribe('cart', (state) => {
+      if (state) {
+        this.cartData = state;
+        this.render();
+      }
     });
   }
 
@@ -51,7 +54,7 @@ export class CustomerDisplayPage {
     const storeLogo = store.logo || '';
 
     const items = this.cartData?.items || [];
-    const totals = this.cartData?.totals || { subtotal: 0, tax: 0, discount: 0, total: 0, itemCount: 0 };
+    const totals = this.cartData?.totals || { subtotal: 0, taxAmount: 0, discountAmount: 0, total: 0, itemCount: 0 };
 
     const itemsHtml = items.length === 0 ? `
       <div class="h-full flex flex-col items-center justify-center text-center p-8 space-y-3 opacity-60">
@@ -61,24 +64,31 @@ export class CustomerDisplayPage {
         <h3 class="text-base font-bold text-[var(--text)]">Ready for Next Customer</h3>
         <p class="text-xs text-[var(--muted)] max-w-xs">Items scanned by the cashier will appear here in real time.</p>
       </div>
-    ` : items.map(item => `
-      <div class="flex items-center justify-between p-3.5 rounded-[18px] glass-card border border-[var(--line)] shadow-xs">
-        <div class="flex items-center space-x-3.5 min-w-0">
-          <div class="w-12 h-12 rounded-[14px] bg-[var(--glass-bg-clear)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-            ${item.product.image_url ? `<img src="${item.product.image_url}" alt="${item.product.name}" class="w-full h-full object-cover" />` : `<span class="font-bold text-sm text-[var(--muted)]">${item.product.name.substring(0, 1)}</span>`}
+    ` : items.map(item => {
+      const unitPrice = Number(item.unit_price ?? item.product?.selling_price ?? item.product?.price ?? 0);
+      const qty = Number(item.quantity) || 1;
+      const lineTotal = unitPrice * qty;
+      const imgSrc = item.product?.image_url || '';
+
+      return `
+        <div class="flex items-center justify-between p-3.5 rounded-[18px] glass-card border border-[var(--line)] shadow-xs">
+          <div class="flex items-center space-x-3.5 min-w-0">
+            <div class="w-12 h-12 rounded-[14px] bg-[var(--glass-bg-clear)] flex items-center justify-center flex-shrink-0 overflow-hidden border border-[var(--line)]">
+              ${imgSrc ? `<img src="${imgSrc}" alt="${item.product?.name || 'Product'}" class="w-full h-full object-cover" />` : `<span class="font-bold text-sm text-[var(--muted)]">${(item.product?.name || 'P').substring(0, 1)}</span>`}
+            </div>
+            <div class="truncate">
+              <h4 class="text-sm font-bold text-[var(--text)] truncate">${item.product?.name || 'Item'}</h4>
+              <p class="text-xs text-[var(--muted)] font-medium mt-0.5">
+                <span class="font-bold text-[var(--accent)]">${qty}</span> &times; ${formatCurrency(unitPrice)}
+              </p>
+            </div>
           </div>
-          <div class="truncate">
-            <h4 class="text-sm font-bold text-[var(--text)] truncate">${item.product.name}</h4>
-            <p class="text-xs text-[var(--muted)] font-medium mt-0.5">
-              <span class="font-bold text-[var(--accent)]">${item.quantity}</span> &times; ${formatCurrency(item.product.price)}
-            </p>
+          <div class="text-right flex-shrink-0 pl-3">
+            <span class="text-sm font-black text-[var(--text)] font-mono">${formatCurrency(lineTotal)}</span>
           </div>
         </div>
-        <div class="text-right flex-shrink-0 pl-3">
-          <span class="text-sm font-black text-[var(--text)]">${formatCurrency(item.product.price * item.quantity)}</span>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     this.container.innerHTML = `
       <div class="min-h-screen w-full bg-[var(--bg)] text-[var(--text)] flex flex-col p-4 sm:p-8">
@@ -131,17 +141,17 @@ export class CustomerDisplayPage {
                   <span class="font-bold text-[var(--text)]">${formatCurrency(totals.subtotal)}</span>
                 </div>
 
-                ${totals.discount > 0 ? `
+                ${(totals.discountAmount || totals.discount || 0) > 0 ? `
                   <div class="flex justify-between text-emerald-600 dark:text-emerald-400">
                     <span>Discount Savings</span>
-                    <span class="font-bold">-${formatCurrency(totals.discount)}</span>
+                    <span class="font-bold">-${formatCurrency(totals.discountAmount || totals.discount)}</span>
                   </div>
                 ` : ''}
 
-                ${totals.tax > 0 ? `
+                ${(totals.taxAmount || totals.tax || 0) > 0 ? `
                   <div class="flex justify-between">
                     <span>Sales Tax</span>
-                    <span class="font-bold text-[var(--text)]">${formatCurrency(totals.tax)}</span>
+                    <span class="font-bold text-[var(--text)]">${formatCurrency(totals.taxAmount || totals.tax)}</span>
                   </div>
                 ` : ''}
               </div>
@@ -221,8 +231,8 @@ export class CustomerDisplayPage {
             <h2 class="text-2xl font-black font-heading text-[var(--text)]">Payment Successful!</h2>
             <p class="text-xs text-[var(--muted)] font-semibold">Order #${order?.order_number || 'REC-1001'} is confirmed.</p>
           </div>
-          <div class="p-4 rounded-[20px] glass-card border border-[var(--line)] text-sm font-black text-[var(--accent)]">
-            Total Paid: ${formatCurrency(order?.total || 0)}
+          <div class="p-4 rounded-[20px] glass-card border border-[var(--line)] text-sm font-black text-[var(--accent)] font-mono">
+            Total Paid: ${formatCurrency(order?.total || order?.total_amount || 0)}
           </div>
           <p class="text-xs text-[var(--muted)] font-medium">Thank you for visiting ${store.name || 'FlowPOS'}! Please collect your receipt.</p>
         </div>
@@ -230,7 +240,7 @@ export class CustomerDisplayPage {
     `;
 
     setTimeout(() => {
-      this.cartData = { items: [], totals: { subtotal: 0, tax: 0, discount: 0, total: 0, itemCount: 0 } };
+      this.cartData = { items: [], totals: { subtotal: 0, taxAmount: 0, discountAmount: 0, total: 0, itemCount: 0 } };
       this.render();
     }, 4500);
   }

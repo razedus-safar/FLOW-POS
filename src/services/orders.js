@@ -18,6 +18,12 @@ class OrdersService {
     return await localDB.getById('orders', id);
   }
 
+  async getOrdersByCustomer(customerId) {
+    if (!customerId) return [];
+    const orders = await this.getAllOrders();
+    return orders.filter(o => String(o.customer_id) === String(customerId));
+  }
+
   async processRefund({ orderId, itemsToRefund, refundMethod = 'cash', reason = 'Customer return' }) {
     const order = await this.getOrderById(orderId);
     if (!order) throw new Error('Order not found');

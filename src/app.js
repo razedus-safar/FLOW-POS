@@ -126,7 +126,7 @@ export class App {
     const cleanRoute = hash.split('?')[0].split('/')[0];
 
     // Standalone Customer-Facing Display (No shell or login requirement)
-    if (cleanRoute === 'customer-display') {
+    if (['customer-display', 'customer_display', 'customerdisplay', 'customer-screen', 'display', 'secondary-screen'].includes(cleanRoute)) {
       if (this.currentPageInstance && typeof this.currentPageInstance.destroy === 'function') {
         this.currentPageInstance.destroy();
         this.currentPageInstance = null;

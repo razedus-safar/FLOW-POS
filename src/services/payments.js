@@ -13,6 +13,7 @@ import { offlineQueue, QUEUE_ACTIONS } from '../offline/queue.js';
 import { sessionManager } from '../store/session.js';
 import { cartStore } from '../store/cart.js';
 import { syncEngine } from '../offline/sync.js';
+import { customerDisplayService } from './customerDisplay.js';
 import { roundMoney, sanitizeHtml, generateUUID } from '../utils/security.js';
 
 class PaymentsService {
@@ -136,6 +137,14 @@ class PaymentsService {
     // 5. Enqueue into Offline Queue (for background cloud synchronization)
     await offlineQueue.enqueue(QUEUE_ACTIONS.PROCESS_SALE, orderRecord);
     syncEngine.syncNow().catch(() => {});
+
+    // 5b. Broadcast checkout success to secondary customer display
+    customerDisplayService.broadcast('CHECKOUT_COMPLETED', {
+      order_number: orderNumber,
+      total: totals.total,
+      itemCount: totals.itemCount,
+      payments: payments
+    });
 
     // 6. Clear current cart
     cartStore.clearCart();

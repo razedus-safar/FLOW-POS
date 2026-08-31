@@ -7,6 +7,7 @@ import { ordersService } from '../services/orders.js';
 import { DataTable } from '../components/DataTable.js';
 import { Modal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
+import { showConfirmDialog } from '../components/ConfirmDialog.js';
 import { formatCurrency } from '../utils/currency.js';
 import { formatDate } from '../utils/dates.js';
 import { renderIcon } from '../utils/icons.js';
@@ -70,12 +71,20 @@ export class CustomersPage {
       },
       {
         key: 'actions',
-        label: 'Details',
+        label: 'Actions',
         sortable: false,
         render: (_, row) => `
-          <button data-view-cust="${row.id}" class="px-3.5 py-1 rounded-[12px] text-xs font-black glass-btn-secondary hover:text-[var(--accent)] transition">
-            View History
-          </button>
+          <div class="flex items-center space-x-1.5">
+            <button data-view-cust="${row.id}" class="px-3 py-1 rounded-[10px] text-xs font-black glass-btn-secondary hover:text-[var(--accent)] transition" title="View Order History">
+              History
+            </button>
+            <button data-edit-cust="${row.id}" class="p-1.5 rounded-[10px] text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition" title="Edit Customer">
+              ${renderIcon('edit', 'w-3.5 h-3.5')}
+            </button>
+            <button data-delete-cust="${row.id}" class="p-1.5 rounded-[10px] text-[var(--muted)] hover:text-red-500 hover:bg-red-500/10 transition" title="Delete Customer">
+              ${renderIcon('trash-2', 'w-3.5 h-3.5')}
+            </button>
+          </div>
         `
       }
     ];
@@ -113,6 +122,31 @@ export class CustomersPage {
       if (viewBtn) {
         const id = viewBtn.getAttribute('data-view-cust');
         await this.showCustomerProfile(id);
+        return;
+      }
+
+      const editBtn = e.target.closest('[data-edit-cust]');
+      if (editBtn) {
+        const id = editBtn.getAttribute('data-edit-cust');
+        this.openCustomerModal(id);
+        return;
+      }
+
+      const delBtn = e.target.closest('[data-delete-cust]');
+      if (delBtn) {
+        const id = delBtn.getAttribute('data-delete-cust');
+        const cust = this.customers.find(c => c.id === id);
+        showConfirmDialog({
+          title: 'Delete Customer',
+          message: `Are you sure you want to delete ${cust?.name || 'this customer'}? This cannot be undone.`,
+          confirmText: 'Delete Customer',
+          isDanger: true,
+          onConfirm: async () => {
+            await customerService.deleteCustomer(id);
+            toast.success('Customer profile deleted.');
+            await this.init();
+          }
+        });
       }
     });
 
@@ -192,7 +226,10 @@ export class CustomersPage {
     }).open();
   }
 
-  openCustomerModal() {
+  openCustomerModal(customerId = null) {
+    const isEdit = Boolean(customerId);
+    const cust = isEdit ? this.customers.find(c => c.id === customerId) : null;
+
     const modalContent = `
       <form id="customer-form" class="space-y-4">
         <div>
@@ -201,6 +238,7 @@ export class CustomersPage {
             name="name"
             type="text"
             required
+            value="${cust ? sanitizeHtml(cust.name) : ''}"
             placeholder="e.g. Jessica Williams"
             class="glass-input w-full p-2.5 rounded-[12px] text-xs font-semibold"
           />
@@ -212,6 +250,7 @@ export class CustomersPage {
             <input
               name="phone"
               type="tel"
+              value="${cust ? sanitizeHtml(cust.phone || '') : ''}"
               placeholder="+1 (555) 000-0000"
               class="glass-input w-full p-2.5 rounded-[12px] text-xs font-mono font-bold"
             />
@@ -221,10 +260,21 @@ export class CustomersPage {
             <input
               name="email"
               type="email"
+              value="${cust ? sanitizeHtml(cust.email || '') : ''}"
               placeholder="jessica@example.com"
               class="glass-input w-full p-2.5 rounded-[12px] text-xs font-medium"
             />
           </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-black text-[var(--text)] mb-1">Loyalty Tier</label>
+          <select name="tier" class="glass-input w-full p-2.5 rounded-[12px] text-xs font-semibold">
+            <option value="Bronze" ${cust?.tier === 'Bronze' ? 'selected' : ''}>Bronze</option>
+            <option value="Silver" ${cust?.tier === 'Silver' ? 'selected' : ''}>Silver</option>
+            <option value="Gold" ${cust?.tier === 'Gold' ? 'selected' : ''}>Gold</option>
+            <option value="Platinum" ${cust?.tier === 'Platinum' ? 'selected' : ''}>Platinum</option>
+          </select>
         </div>
 
         <div class="flex justify-end space-x-2 pt-3 border-t border-[var(--line)]">
@@ -232,14 +282,14 @@ export class CustomersPage {
             Cancel
           </button>
           <button type="submit" class="px-5 py-2 rounded-[12px] text-xs font-black glass-btn-primary shadow-md">
-            Save Customer
+            ${isEdit ? 'Save Changes' : 'Create Customer'}
           </button>
         </div>
       </form>
     `;
 
     const modal = new Modal({
-      title: 'Add New Customer Profile',
+      title: isEdit ? `Edit Customer: ${cust?.name}` : 'Add New Customer Profile',
       size: 'md',
       content: modalContent,
       onOpen: (modalEl) => {
@@ -251,25 +301,45 @@ export class CustomersPage {
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           const fd = new FormData(form);
-          const data = {
-            name: fd.get('name').trim(),
-            phone: fd.get('phone').trim(),
-            email: fd.get('email').trim(),
-            tier: 'Bronze',
-            loyalty_points: 0,
-            total_spend: 0,
-            order_count: 0
-          };
+          const name = fd.get('name').trim();
+          const phone = fd.get('phone').trim();
+          const email = fd.get('email').trim();
+          const tier = fd.get('tier') || 'Bronze';
 
-          if (!data.name) {
+          if (!name) {
             toast.error('Customer name is required.');
             return;
           }
 
-          await customerService.addCustomer(data);
-          toast.success('Customer profile created!');
+          if (isEdit && cust) {
+            const updated = {
+              ...cust,
+              name,
+              phone,
+              email,
+              tier,
+              updated_at: new Date().toISOString()
+            };
+            await customerService.saveCustomer(updated);
+            toast.success(`Customer ${name} updated!`);
+          } else {
+            const newCust = {
+              id: `cust-${Date.now()}`,
+              name,
+              phone,
+              email,
+              tier,
+              loyalty_points: 0,
+              total_spend: 0,
+              order_count: 0,
+              created_at: new Date().toISOString()
+            };
+            await customerService.addCustomer(newCust);
+            toast.success(`Customer ${name} created!`);
+          }
+
           modal.close();
-          this.init();
+          await this.init();
         });
       }
     });
