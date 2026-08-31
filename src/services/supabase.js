@@ -6,6 +6,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { localDB } from '../offline/database.js';
 
+const DEFAULT_SUPABASE_URL = 'https://syzcbcevxihjvathygvk.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_yr_jcbWJVTWcpvQDe8ic_A_LLHshgmB';
+
 class SupabaseService {
   constructor() {
     this.realtimeChannel = null;
@@ -28,8 +31,8 @@ class SupabaseService {
       ? (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '')
       : '';
 
-    const url = (savedConfig?.url || envUrl || '').trim();
-    const key = (savedConfig?.key || envKey || '').trim();
+    const url = (savedConfig?.url || envUrl || DEFAULT_SUPABASE_URL).trim();
+    const key = (savedConfig?.key || envKey || DEFAULT_SUPABASE_KEY).trim();
 
     this.url = url;
     this.key = key;
@@ -55,11 +58,13 @@ class SupabaseService {
   }
 
   getConfig() {
-    return { url: this.url || '', key: this.key || '', configured: this.isConfigured() };
+    return { url: this.url || DEFAULT_SUPABASE_URL, key: this.key || DEFAULT_SUPABASE_KEY, configured: this.isConfigured() };
   }
 
   configure(url, key) {
-    const config = { url: (url || '').trim(), key: (key || '').trim() };
+    const finalUrl = (url || DEFAULT_SUPABASE_URL).trim();
+    const finalKey = (key || DEFAULT_SUPABASE_KEY).trim();
+    const config = { url: finalUrl, key: finalKey };
     localStorage.setItem('flowpos_supabase_config', JSON.stringify(config));
     this.init();
     return this.isConfigured();
