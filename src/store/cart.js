@@ -54,10 +54,25 @@ class CartStore {
   updateQuantity(productId, newQty) {
     const index = this.items.findIndex(item => item.product.id === productId);
     if (index > -1) {
-      if (newQty <= 0) {
+      const num = Number(newQty);
+      if (num <= 0) {
         this.items.splice(index, 1);
       } else {
-        this.items[index].quantity = newQty;
+        this.items[index].quantity = num;
+      }
+      this.notify();
+    }
+  }
+
+  incrementQuantity(productId, delta = 1) {
+    const index = this.items.findIndex(item => item.product.id === productId);
+    if (index > -1) {
+      const current = Number(this.items[index].quantity) || 1;
+      const next = current + delta;
+      if (next <= 0) {
+        this.items.splice(index, 1);
+      } else {
+        this.items[index].quantity = next;
       }
       this.notify();
     }

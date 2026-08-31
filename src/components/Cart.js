@@ -199,7 +199,7 @@ export class CartPanel {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-qty-inc');
-        cartStore.updateQuantity(id, 1);
+        cartStore.incrementQuantity(id, 1);
       });
     });
 
@@ -207,13 +207,7 @@ export class CartPanel {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-qty-dec');
-        const cartData = globalStore.get('cart');
-        const item = cartData.items.find(i => i.product.id === id);
-        if (item && item.quantity === 1) {
-          cartStore.removeItem(id);
-        } else {
-          cartStore.updateQuantity(id, -1);
-        }
+        cartStore.incrementQuantity(id, -1);
       });
     });
 
