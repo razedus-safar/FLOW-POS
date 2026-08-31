@@ -475,6 +475,27 @@ export const INITIAL_PRODUCTS = [
 ];
 
 class ProductService {
+  async loadDemoCatalog() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('flowpos_db_seeded', 'true');
+    }
+    await localDB.putMany('categories', INITIAL_CATEGORIES);
+    await localDB.putMany('products', INITIAL_PRODUCTS);
+    
+    if (supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.syncAllToCloud();
+      } catch (err) {
+        console.warn('Sync demo products to cloud warning:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:products-updated'));
+    }
+    return true;
+  }
+
   async ensureSeeded() {
     const isWiped = typeof localStorage !== 'undefined' && localStorage.getItem('flowpos_db_seeded') === 'wiped';
     if (isWiped) {

@@ -350,13 +350,49 @@ export class POSPage {
     grid.innerHTML = '';
 
     if (productsList.length === 0) {
-      grid.innerHTML = `
+      const isTotallyEmpty = this.products.length === 0;
+      grid.innerHTML = isTotallyEmpty ? `
+        <div class="col-span-full py-12 px-6 text-center glass-card rounded-[28px] border border-[var(--line)] max-w-lg mx-auto my-6 shadow-sm">
+          <div class="text-4xl mb-3">🛍️</div>
+          <h3 class="text-base font-black text-[var(--text)] mb-1">Your Store Catalog is Empty</h3>
+          <p class="text-xs text-[var(--muted)] mb-5 max-w-sm mx-auto leading-relaxed">You haven't added any products to your shop inventory yet. You can create your first product or load the sample retail catalog with 1 click.</p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            <a href="#/products" class="w-full sm:w-auto px-5 py-2.5 rounded-[14px] text-xs font-black glass-btn-primary shadow-sm flex items-center justify-center space-x-1.5 active:scale-95 transition">
+              <span>➕</span>
+              <span>Add First Product</span>
+            </a>
+            <button type="button" id="pos-load-demo-catalog-btn" class="w-full sm:w-auto px-4 py-2.5 rounded-[14px] text-xs font-bold glass-btn-secondary text-[var(--accent)] flex items-center justify-center space-x-1.5 active:scale-95 transition">
+              <span>✨</span>
+              <span>Load 26 Demo Products</span>
+            </button>
+          </div>
+        </div>
+      ` : `
         <div class="col-span-full py-16 flex flex-col items-center justify-center text-[var(--muted)] glass-card rounded-[24px] p-8 border border-[var(--line)]">
           <div class="text-4xl mb-2">📦</div>
-          <strong class="text-sm font-black text-[var(--text)]">No products found</strong>
-          <span class="text-xs text-[var(--muted)] mt-1 font-medium">Try another search keyword or category filter</span>
+          <strong class="text-sm font-black text-[var(--text)]">No matching products found</strong>
+          <span class="text-xs text-[var(--muted)] mt-1 font-medium">Try another search keyword or select "All Products"</span>
         </div>
       `;
+
+      const demoBtn = grid.querySelector('#pos-load-demo-catalog-btn');
+      if (demoBtn) {
+        demoBtn.addEventListener('click', async () => {
+          demoBtn.disabled = true;
+          demoBtn.textContent = 'Loading Catalog…';
+          try {
+            await productService.loadDemoCatalog();
+            toast.success('Loaded 26 sample products into your catalog!');
+            await this.loadData();
+            this.render();
+            this.attachEvents();
+          } catch (err) {
+            toast.error(err.message || 'Failed to load sample products');
+            demoBtn.disabled = false;
+            demoBtn.textContent = '✨ Load 26 Demo Products';
+          }
+        });
+      }
       return;
     }
 

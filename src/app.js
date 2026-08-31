@@ -147,7 +147,7 @@ export class App {
         this.currentPageInstance.destroy();
         this.currentPageInstance = null;
       }
-      this.root.innerHTML = `<div id="login-view-container" class="w-full h-full"></div>`;
+      this.root.innerHTML = `<div id="login-view-container" class="w-full h-full overflow-y-auto"></div>`;
       const loginContainer = this.root.querySelector('#login-view-container');
       new LoginPage(loginContainer, () => {
         window.location.hash = '#/pos';
