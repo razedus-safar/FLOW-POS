@@ -1,0 +1,17 @@
+{
+  "name": "FlowPOS — Retail Point of Sale",
+  "short_name": "FlowPOS",
+  "description": "Commercial-grade offline-first retail Point of Sale system.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

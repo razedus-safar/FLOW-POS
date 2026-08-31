@@ -1,0 +1,440 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", -apple-system, system-ui, sans-serif;
+    --font-mono: "SF Mono", Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+
+    /* Ergonomic Matte Anti-Glare Light Theme */
+    --bg: #DFE5EC;                        /* Calm matte slate canvas */
+    --bg-secondary: #F1F5F9;              /* Soothing soft matte surface */
+    --card-bg: #FFFFFF;                   /* Crisp defined card surface */
+    --glass-bg: #F1F5F9;                  /* Non-glare chrome header/sidebar */
+    --glass-bg-clear: #E2E8F0;            /* Subtle sub-pill */
+    --glass-border: #CBD5E1;              /* Defined clean border */
+    --glass-highlight: rgba(255, 255, 255, 0.70);
+    --glass-shadow: rgba(15, 23, 42, 0.06);
+
+    /* Deep Slate Ink for Maximum Legibility & Readability */
+    --text: #0F172A;                     /* Deep slate obsidian primary text */
+    --text-muted: #334155;                /* Slate 700 high-contrast secondary text */
+    --muted: #334155;
+    --line: #CBD5E1;                      /* Crisp defined borders */
+    --line-subtle: #E2E8F0;
+
+    /* High-Contrast Non-Neon Ergonomic Accents */
+    --accent: #0066CC;
+    --accent-glow: rgba(0, 102, 204, 0.20);
+    --green: #047857;
+    --indigo: #4338CA;
+    --orange: #C2410C;
+    --amber: #B45309;
+    --pink: #BE185D;
+    --purple: #6B21A8;
+    --red: #B91C1C;
+    --teal: #0F766E;
+    --yellow: #854D0E;
+
+    /* Continuous Squircle Radii Scale */
+    --radius-control: 12px;
+    --radius-glass: 18px;
+    --radius-modal: 24px;
+  }
+
+  body.dark, :root.dark, html.dark, .dark {
+    /* Modern Dark Theme Palette */
+    --bg: #0B0F19;
+    --bg-secondary: #161F30;
+    --card-bg: #161F30;
+    --glass-bg: #161F30;
+    --glass-bg-clear: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-highlight: rgba(255, 255, 255, 0.15);
+    --glass-shadow: rgba(0, 0, 0, 0.60);
+
+    --text: #F8FAFC;                       /* Crisp white text */
+    --text-muted: #94A3B8;                 /* Slate 400 secondary text */
+    --muted: #94A3B8;
+    --line: rgba(255, 255, 255, 0.12);
+    --line-subtle: rgba(255, 255, 255, 0.06);
+
+    --accent: #38BDF8;
+    --accent-glow: rgba(56, 189, 248, 0.30);
+    --green: #4ADE80;
+    --indigo: #818CF8;
+    --orange: #FB923C;
+    --amber: #FBBF24;
+    --pink: #F472B6;
+    --purple: #C084FC;
+    --red: #F87171;
+    --teal: #2DD4BF;
+    --yellow: #FDE047;
+  }
+}
+
+/* Master Clean Canvas */
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  background-color: var(--bg);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  letter-spacing: -0.015em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.dark, .dark body {
+  background-color: var(--bg);
+}
+
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.025em;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.font-mono, td.font-mono, span.font-mono, p.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* =========================================================================
+   Universal High-Contrast Status & Tier Badge System
+   ========================================================================= */
+
+.badge, [class*="badge-"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Gold Tier / High Alert */
+.badge-gold {
+  background-color: #FEF3C7 !important;
+  color: #78350F !important;
+  border: 1px solid #F59E0B !important;
+}
+.dark .badge-gold {
+  background-color: rgba(245, 158, 11, 0.25) !important;
+  color: #FDE68A !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+}
+
+/* Platinum Tier */
+.badge-platinum {
+  background-color: #F3E8FF !important;
+  color: #581C87 !important;
+  border: 1px solid #C084FC !important;
+}
+.dark .badge-platinum {
+  background-color: rgba(192, 132, 252, 0.25) !important;
+  color: #E9D5FF !important;
+  border: 1px solid rgba(192, 132, 252, 0.45) !important;
+}
+
+/* Silver Tier */
+.badge-silver {
+  background-color: #E0F2FE !important;
+  color: #0369A1 !important;
+  border: 1px solid #7DD3FC !important;
+}
+.dark .badge-silver {
+  background-color: rgba(56, 189, 248, 0.25) !important;
+  color: #BAE6FD !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+}
+
+/* Bronze Tier */
+.badge-bronze {
+  background-color: #F1F5F9 !important;
+  color: #1E293B !important;
+  border: 1px solid #94A3B8 !important;
+}
+.dark .badge-bronze {
+  background-color: rgba(148, 163, 184, 0.25) !important;
+  color: #E2E8F0 !important;
+  border: 1px solid rgba(148, 163, 184, 0.45) !important;
+}
+
+/* Active / Emerald / Online / In Stock */
+.badge-emerald, .badge-green, .badge-active, .badge-online {
+  background-color: #D1FAE5 !important;
+  color: #064E3B !important;
+  border: 1px solid #34D399 !important;
+}
+.dark .badge-emerald, .dark .badge-green, .dark .badge-active, .dark .badge-online {
+  background-color: rgba(52, 211, 153, 0.25) !important;
+  color: #6EE7B7 !important;
+  border: 1px solid rgba(52, 211, 153, 0.45) !important;
+}
+
+/* Blue / Info / Ordered */
+.badge-blue {
+  background-color: #DBEAFE !important;
+  color: #1E3A8A !important;
+  border: 1px solid #60A5FA !important;
+}
+.dark .badge-blue {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+  color: #93C5FD !important;
+  border: 1px solid rgba(59, 130, 246, 0.45) !important;
+}
+
+/* Red / Danger / Out of Stock / Refunded */
+.badge-red, .badge-danger {
+  background-color: #FEE2E2 !important;
+  color: #7F1D1D !important;
+  border: 1px solid #F87171 !important;
+}
+.dark .badge-red, .dark .badge-danger {
+  background-color: rgba(248, 113, 113, 0.25) !important;
+  color: #FCA5A5 !important;
+  border: 1px solid rgba(248, 113, 113, 0.45) !important;
+}
+
+/* Amber / Warning / Low Stock */
+.badge-amber, .badge-warning {
+  background-color: #FEF3C7 !important;
+  color: #78350F !important;
+  border: 1px solid #F59E0B !important;
+}
+.dark .badge-amber, .dark .badge-warning {
+  background-color: rgba(251, 191, 36, 0.25) !important;
+  color: #FDE68A !important;
+  border: 1px solid rgba(251, 191, 36, 0.45) !important;
+}
+
+/* High-Contrast Clean Table Styling */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--text) !important;
+}
+
+thead {
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.dark thead {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+th {
+  color: var(--text) !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  padding: 14px 18px !important;
+}
+
+td {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--line) !important;
+}
+
+tbody tr {
+  background: var(--card-bg) !important;
+  transition: background-color 0.15s ease;
+}
+
+tbody tr:hover {
+  background-color: #E2E8F0 !important;
+}
+
+.dark tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Chrome Glass / Panels */
+.liquid-glass, .glass, .glass-panel {
+  position: relative;
+  background: var(--glass-bg);
+  border-radius: var(--radius-glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 1px 3px var(--glass-shadow);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Modal Dialogs */
+.glass2, .glass-panel-heavy {
+  background: var(--card-bg);
+  border-radius: var(--radius-modal);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* Clean Solid Content Cards */
+.glass-card {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-glass);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: #94A3B8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+/* Modern Form Inputs */
+.glass-input {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.glass-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Tactile Primary Buttons */
+.glass-btn-primary {
+  position: relative;
+  background: var(--accent);
+  color: #FFFFFF !important;
+  border-radius: var(--radius-control);
+  box-shadow: 0 2px 8px var(--accent-glow);
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.glass-btn-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.glass-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Buttons */
+.glass-btn-secondary {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  color: var(--text) !important;
+  border-radius: var(--radius-control);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.glass-btn-secondary:hover {
+  background: var(--glass-bg-clear);
+  color: var(--accent) !important;
+  border-color: #94A3B8;
+}
+
+.glass-btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Category Filter Chips - Larger & Clearer */
+.chip {
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 8px 18px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.chip:hover {
+  background: var(--glass-bg-clear);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.chip.active {
+  background: var(--accent);
+  color: #FFFFFF !important;
+  border-color: transparent;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* Keyboard Shortcut Badges */
+kbd, .kbd-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  background: var(--glass-bg-clear);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  line-height: 1;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Force Hidden Utility */
+.hidden {
+  display: none !important;
+}

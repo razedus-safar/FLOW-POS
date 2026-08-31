@@ -1,0 +1,39 @@
+{
+  "name": "flowpos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "High-performance Offline-First Retail POS & ERP with Liquid Glassmorphism UI, IndexedDB persistence, and Supabase Cloud Sync.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/verify_codebase.mjs"
+  },
+  "keywords": [
+    "pos",
+    "point-of-sale",
+    "retail",
+    "offline-first",
+    "indexeddb",
+    "supabase",
+    "tailwindcss",
+    "vite",
+    "kds",
+    "barcode"
+  ],
+  "author": "FlowPOS Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "canvas-confetti": "^1.9.4",
+    "html5-qrcode": "^2.3.8",
+    "jsbarcode": "^3.12.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "vite": "^6.2.0"
+  }
+}
+
