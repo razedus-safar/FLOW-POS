@@ -250,6 +250,9 @@ class SupabaseService {
       const { data: cloudSettings, error: setErr } = await this.client.from('settings').select('*').eq('key', 'global_settings').single();
       if (!setErr && cloudSettings?.value) {
         localStorage.setItem('flowpos_app_settings', JSON.stringify(cloudSettings.value));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('flowpos:settings-updated', { detail: cloudSettings.value }));
+        }
       }
 
       // 3. Pull Categories
@@ -308,6 +311,15 @@ class SupabaseService {
     try {
       this.realtimeChannel = this.client
         .channel('flowpos-live-mesh')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async (payload) => {
+          if (payload.new && payload.new.value) {
+            localStorage.setItem('flowpos_app_settings', JSON.stringify(payload.new.value));
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('flowpos:settings-updated', { detail: payload.new.value }));
+            }
+            if (onUpdateCallback) onUpdateCallback('settings', payload);
+          }
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async (payload) => {
           if (payload.new) {
             const users = JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]');
