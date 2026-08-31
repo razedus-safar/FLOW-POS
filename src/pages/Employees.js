@@ -472,7 +472,7 @@ export class EmployeesPage {
         }
 
         if (form) {
-          form.addEventListener('submit', (e) => {
+          form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const avatarVal = avatarHiddenInput.value || currentAvatarUrl;
             const data = {
@@ -486,10 +486,10 @@ export class EmployeesPage {
 
             try {
               if (isEdit) {
-                sessionManager.updateUser(userId, data);
+                await sessionManager.updateUser(userId, data);
                 toast.success(`Profile photo & details updated for ${data.name}!`);
               } else {
-                sessionManager.addUser(data);
+                await sessionManager.addUser(data);
                 toast.success(`Staff member ${data.name} created!`);
               }
               modal.close();

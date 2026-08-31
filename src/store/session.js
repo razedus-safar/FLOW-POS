@@ -115,29 +115,49 @@ class SessionManager {
       }
     }
 
-    // Auto-migrate legacy 'safar' user to 'admin'
+    // Strict deduplication by ID and sanitize legacy duplicate admin accounts
+    const uniqueMap = new Map();
+    let hasPrimaryOwner = false;
+
     for (const u of list) {
-      if (u.name.toLowerCase() === 'safar' || u.id === 'usr-safar') {
-        u.id = 'usr-admin';
-        u.name = 'admin';
-        u.email = 'admin@flowpos.store';
-        u.password = 'admin';
-        u.pin = '1234';
-        u.role = ROLES.OWNER;
-        u.title = 'Store Owner & Executive Admin';
+      const isLegacyAdmin = u.name?.toLowerCase() === 'safar' || u.id === 'usr-safar' || u.name?.toLowerCase() === 'admin' || u.id === 'usr-admin';
+      
+      if (isLegacyAdmin) {
+        if (!hasPrimaryOwner) {
+          uniqueMap.set('usr-admin', {
+            id: 'usr-admin',
+            name: 'admin',
+            role: ROLES.OWNER,
+            email: u.email || 'admin@flowpos.store',
+            pin: u.pin || '1234',
+            password: u.password || 'admin',
+            avatar: u.avatar || DEFAULT_USERS[0].avatar,
+            title: 'Store Owner & Executive Admin'
+          });
+          hasPrimaryOwner = true;
+        }
+        // Skip duplicate second admin!
+      } else {
+        const safeId = String(u.id || `usr-${Math.random().toString(36).slice(2, 8)}`);
+        if (!uniqueMap.has(safeId)) {
+          uniqueMap.set(safeId, {
+            ...u,
+            id: safeId,
+            role: u.role === ROLES.OWNER ? ROLES.MANAGER : (u.role || ROLES.CASHIER)
+          });
+        }
       }
     }
 
-    // Ensure an owner always exists with OWNER role & permanent access
-    const ownerIdx = list.findIndex(u => u.role === ROLES.OWNER || u.name.toLowerCase() === 'admin' || u.id === 'usr-admin');
-    if (ownerIdx >= 0) {
-      list[ownerIdx].role = ROLES.OWNER;
-      list[ownerIdx].name = list[ownerIdx].name || 'admin';
-      list[ownerIdx].password = list[ownerIdx].password || 'admin';
-      list[ownerIdx].pin = list[ownerIdx].pin || '1234';
-      list[ownerIdx].title = list[ownerIdx].title || 'Store Owner & Executive Admin';
-    } else {
+    list = Array.from(uniqueMap.values());
+
+    // Guarantee the primary owner is at index 0
+    if (!hasPrimaryOwner) {
       list.unshift(DEFAULT_USERS[0]);
+    }
+
+    if (hasStorage) {
+      localStorage.setItem('flowpos_staff_users', JSON.stringify(list));
     }
 
     this.users = list;
@@ -298,16 +318,23 @@ class SessionManager {
     return hasPermission(this.currentUser, permission);
   }
 
-  addUser({ name, email, role, pin, password, avatar, title }) {
+  async addUser({ name, email, role, pin, password, avatar, title }) {
     // Only one Owner allowed - cannot add a second Owner directly
     if (role === ROLES.OWNER) {
       role = ROLES.MANAGER;
     }
 
+    const trimmedName = (name || '').trim();
+    if (trimmedName.toLowerCase() === 'admin' || trimmedName.toLowerCase() === 'safar') {
+      throw new Error('The username "admin" is reserved for the Primary Store Owner. Please choose a different name.');
+    }
+
+    const safeEmail = email ? email.trim().toLowerCase() : `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '')}@flowpos.store`;
+
     const newUser = {
       id: `usr-${Date.now()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
+      name: trimmedName,
+      email: safeEmail,
       role: role || ROLES.CASHIER,
       pin: pin || '1234',
       password: password || '123456',
@@ -315,20 +342,20 @@ class SessionManager {
       title: title || role
     };
 
-    const exists = this.users.some(u => u.email === newUser.email);
+    const exists = this.users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase() || u.name.toLowerCase() === newUser.name.toLowerCase());
     if (exists) {
-      throw new Error(`A user with email ${newUser.email} already exists.`);
+      throw new Error(`A staff user with name "${newUser.name}" or email "${newUser.email}" already exists.`);
     }
 
     this.users.push(newUser);
-    this.saveUsers(this.users);
+    await this.saveUsers(this.users);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('flowpos:user-updated', { detail: { user: newUser } }));
     }
     return newUser;
   }
 
-  updateUser(id, updates) {
+  async updateUser(id, updates) {
     const idx = this.users.findIndex(u => u.id === id);
     if (idx === -1) throw new Error('User not found.');
 
@@ -344,7 +371,7 @@ class SessionManager {
     }
 
     this.users[idx] = { ...this.users[idx], ...updates };
-    this.saveUsers(this.users);
+    await this.saveUsers(this.users);
 
     if (this.currentUser && this.currentUser.id === id) {
       this.currentUser = this.users[idx];
