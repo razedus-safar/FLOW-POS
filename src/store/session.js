@@ -363,6 +363,16 @@ class SessionManager {
     this.users = this.users.filter(u => u.id !== id);
     this.saveUsers(this.users);
 
+    if (typeof localDB !== 'undefined' && localDB.delete) {
+      localDB.delete('users', id).catch(() => {});
+    }
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      supabaseClient.client.from('users').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase delete user error:', error.message);
+      }).catch(err => console.warn('Supabase delete user failed:', err));
+    }
+
     if (this.currentUser && this.currentUser.id === id) {
       this.setAuthenticatedUser(this.users[0]);
     }

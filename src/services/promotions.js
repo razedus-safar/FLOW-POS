@@ -3,6 +3,8 @@
  * Automated BOGO, Happy Hour time-based rules, and volume bundle discounts
  */
 
+import { supabaseClient } from './supabase.js';
+
 const STORAGE_KEY = 'flowpos_promotions';
 
 export const DEFAULT_PROMOTIONS = [
@@ -80,15 +82,40 @@ class PromotionsService {
     if (existingIdx >= 0) {
       this.promotions[existingIdx] = promo;
     } else {
-      this.promotions.push({ ...promo, id: promo.id || `promo-${Date.now().toString().slice(-4)}` });
+      promo.id = promo.id || `promo-${Date.now().toString().slice(-4)}`;
+      this.promotions.push(promo);
     }
     this.save(this.promotions);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('promotions').upsert({
+          id: String(promo.id),
+          name: promo.name,
+          type: promo.type || 'percentage',
+          value: Number(promo.value) || 0,
+          category_id: promo.category_id || null,
+          min_order_amount: Number(promo.min_order_amount) || 0,
+          min_items: Number(promo.min_items) || 0,
+          is_active: promo.is_active !== false,
+          badge: promo.badge || '',
+          created_at: new Date().toISOString()
+        }, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return promo;
   }
 
   deletePromotion(id) {
     this.promotions = this.promotions.filter(p => p.id !== id);
     this.save(this.promotions);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('promotions').delete().eq('id', id).catch(() => {});
+      } catch (err) {}
+    }
   }
 
   toggleActive(id) {
@@ -96,6 +123,11 @@ class PromotionsService {
     if (p) {
       p.is_active = !p.is_active;
       this.save(this.promotions);
+      if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+        try {
+          supabaseClient.client.from('promotions').update({ is_active: p.is_active }).eq('id', id).catch(() => {});
+        } catch (err) {}
+      }
     }
   }
 

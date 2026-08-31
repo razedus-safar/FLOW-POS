@@ -3,6 +3,7 @@
  */
 
 import { localDB } from '../offline/database.js';
+import { supabaseClient } from './supabase.js';
 
 export const INITIAL_SUPPLIERS = [
   {
@@ -61,12 +62,51 @@ class SupplierService {
     if (!supplier.id) {
       supplier.id = `sup-${Date.now()}`;
     }
+    supplier.lead_time_days = Number(supplier.lead_time_days) || 3;
+    supplier.payment_terms = supplier.payment_terms || 'Net 30';
+    supplier.is_active = supplier.is_active !== false;
+
     await localDB.put('suppliers', supplier);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.client.from('suppliers').upsert({
+          id: String(supplier.id),
+          name: supplier.name,
+          contact_person: supplier.contact_person || '',
+          email: supplier.email || '',
+          phone: supplier.phone || '',
+          address: supplier.address || '',
+          lead_time_days: supplier.lead_time_days,
+          payment_terms: supplier.payment_terms,
+          is_active: supplier.is_active,
+          created_at: supplier.created_at || new Date().toISOString()
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Online supplier sync failed:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:suppliers-updated', { detail: supplier }));
+    }
     return supplier;
   }
 
   async deleteSupplier(id) {
     await localDB.delete('suppliers', id);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.client.from('suppliers').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Online supplier delete failed:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:suppliers-updated', { detail: { id, deleted: true } }));
+    }
   }
 }
 

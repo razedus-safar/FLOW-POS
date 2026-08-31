@@ -3,6 +3,8 @@
  * Issue, track balances, top-up, and redeem gift cards across physical & online registers
  */
 
+import { supabaseClient } from './supabase.js';
+
 const STORAGE_KEY = 'flowpos_gift_cards';
 
 export const INITIAL_GIFT_CARDS = [
@@ -93,7 +95,25 @@ class GiftCardsService {
 
     this.cards.unshift(newCard);
     this.save(this.cards);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('gift_cards').upsert(newCard, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return newCard;
+  }
+
+  deleteGiftCard(id) {
+    this.cards = this.cards.filter(c => c.id !== id);
+    this.save(this.cards);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('gift_cards').delete().eq('id', id).catch(() => {});
+      } catch (err) {}
+    }
   }
 
   redeem(code, amountToRedeem, orderRef = '') {
@@ -117,6 +137,13 @@ class GiftCardsService {
     });
 
     this.save(this.cards);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('gift_cards').upsert(card, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return {
       success: true,
       redeemed: redeemAmount,
@@ -140,6 +167,13 @@ class GiftCardsService {
     });
 
     this.save(this.cards);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('gift_cards').upsert(card, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return card;
   }
 

@@ -4,6 +4,7 @@
 
 import { localDB } from '../offline/database.js';
 import { auditService } from './audit.js';
+import { supabaseClient } from './supabase.js';
 
 export const INITIAL_CUSTOMERS = [
   {
@@ -88,6 +89,10 @@ class CustomerService {
     return await localDB.getById('customers', id);
   }
 
+  async addCustomer(customer) {
+    return await this.saveCustomer(customer);
+  }
+
   async saveCustomer(customer) {
     if (!customer.id) {
       customer.id = `cust-${Date.now()}`;
@@ -100,7 +105,49 @@ class CustomerService {
     customer.updated_at = new Date().toISOString();
     await localDB.put('customers', customer);
     auditService.log('CUSTOMER_SAVED', 'customers', customer.id, { name: customer.name });
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.client.from('customers').upsert({
+          id: String(customer.id),
+          name: customer.name,
+          phone: customer.phone || null,
+          email: customer.email || null,
+          address: customer.address || '',
+          loyalty_points: Number(customer.loyalty_points) || 0,
+          tier: customer.tier || 'Bronze',
+          total_spend: Number(customer.total_spend) || 0,
+          order_count: Number(customer.order_count) || 0,
+          notes: customer.notes || '',
+          created_at: customer.created_at || new Date().toISOString(),
+          updated_at: customer.updated_at || new Date().toISOString()
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Online customer sync failed:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:customers-updated', { detail: customer }));
+    }
     return customer;
+  }
+
+  async deleteCustomer(id) {
+    await localDB.delete('customers', id);
+    auditService.log('CUSTOMER_DELETED', 'customers', id, { id });
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.client.from('customers').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Online customer delete failed:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:customers-updated', { detail: { id, deleted: true } }));
+    }
   }
 
   async searchCustomers(query) {

@@ -82,6 +82,7 @@ class SupabaseService {
 
   /**
    * PUSH / SYNC ALL LOCAL STORE DATA TO CLOUD
+   * Upserts active records and removes any previously deleted records from Supabase
    */
   async syncAllToCloud() {
     if (!this.isConfigured()) throw new Error('Cloud database is not configured');
@@ -110,6 +111,21 @@ class SupabaseService {
       }));
       const { error } = await this.client.from('users').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Users sync error: ${error.message}`);
+
+      // Clean up any deleted users in cloud
+      try {
+        const activeIds = users.map(u => String(u.id));
+        const { data: cloudUsers } = await this.client.from('users').select('id');
+        if (cloudUsers && Array.isArray(cloudUsers)) {
+          for (const cu of cloudUsers) {
+            if (!activeIds.includes(cu.id)) {
+              await this.client.from('users').delete().eq('id', cu.id);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('User deletion cleanup warning:', e);
+      }
     }
 
     // 2. Sync Store Settings & Branding
@@ -136,6 +152,19 @@ class SupabaseService {
       }));
       const { error } = await this.client.from('categories').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Categories sync error: ${error.message}`);
+
+      // Clean up deleted categories
+      try {
+        const activeCatIds = categories.map(c => String(c.id));
+        const { data: cloudCats } = await this.client.from('categories').select('id');
+        if (cloudCats && Array.isArray(cloudCats)) {
+          for (const cc of cloudCats) {
+            if (!activeCatIds.includes(cc.id)) {
+              await this.client.from('categories').delete().eq('id', cc.id);
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     // 4. Sync Suppliers
@@ -154,6 +183,19 @@ class SupabaseService {
       }));
       const { error } = await this.client.from('suppliers').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Suppliers sync error: ${error.message}`);
+
+      // Clean up deleted suppliers
+      try {
+        const activeSuppIds = suppliers.map(s => String(s.id));
+        const { data: cloudSupps } = await this.client.from('suppliers').select('id');
+        if (cloudSupps && Array.isArray(cloudSupps)) {
+          for (const cs of cloudSupps) {
+            if (!activeSuppIds.includes(cs.id)) {
+              await this.client.from('suppliers').delete().eq('id', cs.id);
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     // 5. Sync Products
@@ -180,6 +222,19 @@ class SupabaseService {
       }));
       const { error } = await this.client.from('products').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Products sync error: ${error.message}`);
+
+      // Clean up deleted products
+      try {
+        const activeProdIds = products.map(p => String(p.id));
+        const { data: cloudProds } = await this.client.from('products').select('id');
+        if (cloudProds && Array.isArray(cloudProds)) {
+          for (const cp of cloudProds) {
+            if (!activeProdIds.includes(cp.id)) {
+              await this.client.from('products').delete().eq('id', cp.id);
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     // 6. Sync Customers
@@ -199,6 +254,19 @@ class SupabaseService {
       }));
       const { error } = await this.client.from('customers').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Customers sync error: ${error.message}`);
+
+      // Clean up deleted customers
+      try {
+        const activeCustIds = customers.map(c => String(c.id));
+        const { data: cloudCusts } = await this.client.from('customers').select('id');
+        if (cloudCusts && Array.isArray(cloudCusts)) {
+          for (const cc of cloudCusts) {
+            if (!activeCustIds.includes(cc.id)) {
+              await this.client.from('customers').delete().eq('id', cc.id);
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     // 7. Sync Orders
@@ -321,7 +389,13 @@ class SupabaseService {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async (payload) => {
-          if (payload.new) {
+          if (payload.eventType === 'DELETE' && payload.old) {
+            let users = JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]');
+            users = users.filter(u => u.id !== payload.old.id);
+            localStorage.setItem('flowpos_staff_users', JSON.stringify(users));
+            await localDB.delete('users', payload.old.id);
+            if (onUpdateCallback) onUpdateCallback('users', payload);
+          } else if (payload.new) {
             const users = JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]');
             const idx = users.findIndex(u => u.id === payload.new.id);
             if (idx >= 0) users[idx] = payload.new;
@@ -332,7 +406,7 @@ class SupabaseService {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
-          if (payload.eventType === 'DELETE') {
+          if (payload.eventType === 'DELETE' && payload.old) {
             await localDB.delete('products', payload.old.id);
           } else if (payload.new) {
             await localDB.put('products', payload.new);

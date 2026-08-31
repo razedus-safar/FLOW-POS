@@ -5,6 +5,7 @@
 import { localDB } from '../offline/database.js';
 import { auditService } from './audit.js';
 import { sessionManager } from '../store/session.js';
+import { supabaseClient } from './supabase.js';
 
 class RegisterService {
   constructor() {
@@ -12,13 +13,15 @@ class RegisterService {
   }
 
   getActiveSession() {
-    if (typeof localStorage === 'undefined') return this.inMemorySession || null;
-    try {
-      const data = localStorage.getItem(this.sessionKey);
-      return data ? JSON.parse(data) : (this.inMemorySession || null);
-    } catch {
-      return this.inMemorySession || null;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const data = localStorage.getItem(this.sessionKey);
+        return data ? JSON.parse(data) : (this.inMemorySession || null);
+      } catch {
+        return this.inMemorySession || null;
+      }
     }
+    return this.inMemorySession || null;
   }
 
   async openSession(openingCash = 200.00, notes = '') {
@@ -48,6 +51,29 @@ class RegisterService {
     }
     await localDB.put('register_sessions', session);
     auditService.log('REGISTER_OPENED', 'registers', session.id, { opening_cash: session.opening_cash });
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('register_sessions').upsert({
+          id: session.id,
+          register_id: session.register_id,
+          register_name: session.register_name,
+          user_id: session.user_id,
+          user_name: session.user_name,
+          opening_cash: session.opening_cash,
+          total_cash_sales: session.total_cash_sales,
+          total_card_sales: session.total_card_sales,
+          total_mobile_sales: session.total_mobile_sales,
+          cash_in_total: session.cash_in_total,
+          cash_out_total: session.cash_out_total,
+          status: session.status,
+          notes: session.notes,
+          opened_at: session.opened_at,
+          closed_at: session.closed_at
+        }, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return session;
   }
 
@@ -78,6 +104,29 @@ class RegisterService {
     }
     await localDB.put('register_sessions', session);
     auditService.log('CASH_MOVEMENT', 'registers', session.id, { type: movement.type, amount: movement.amount, reason });
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('register_sessions').upsert({
+          id: session.id,
+          register_id: session.register_id,
+          register_name: session.register_name,
+          user_id: session.user_id,
+          user_name: session.user_name,
+          opening_cash: session.opening_cash,
+          total_cash_sales: session.total_cash_sales,
+          total_card_sales: session.total_card_sales,
+          total_mobile_sales: session.total_mobile_sales,
+          cash_in_total: session.cash_in_total,
+          cash_out_total: session.cash_out_total,
+          status: session.status,
+          notes: session.notes,
+          opened_at: session.opened_at,
+          closed_at: session.closed_at
+        }, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return session;
   }
 
@@ -116,6 +165,28 @@ class RegisterService {
       actual: Number(actualCash),
       variance: difference
     });
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('register_sessions').upsert({
+          id: session.id,
+          register_id: session.register_id,
+          register_name: session.register_name,
+          user_id: session.user_id,
+          user_name: session.user_name,
+          opening_cash: session.opening_cash,
+          total_cash_sales: session.total_cash_sales,
+          total_card_sales: session.total_card_sales,
+          total_mobile_sales: session.total_mobile_sales,
+          cash_in_total: session.cash_in_total,
+          cash_out_total: session.cash_out_total,
+          status: session.status,
+          notes: session.closing_notes,
+          opened_at: session.opened_at,
+          closed_at: session.closed_at
+        }, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
 
     return session;
   }

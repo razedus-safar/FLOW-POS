@@ -3,6 +3,8 @@
  * Manage multiple physical stores, warehouses, and inter-branch inventory transfers
  */
 
+import { supabaseClient } from './supabase.js';
+
 const STORAGE_KEY = 'flowpos_outlets';
 const ACTIVE_OUTLET_KEY = 'flowpos_active_outlet_id';
 
@@ -110,9 +112,17 @@ class OutletsService {
     if (idx >= 0) {
       this.outlets[idx] = outlet;
     } else {
-      this.outlets.push({ ...outlet, id: outlet.id || `out-${Date.now().toString().slice(-4)}` });
+      outlet.id = outlet.id || `out-${Date.now().toString().slice(-4)}`;
+      this.outlets.push(outlet);
     }
     this.save(this.outlets);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('outlets').upsert(outlet, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return outlet;
   }
 
@@ -120,6 +130,12 @@ class OutletsService {
     if (this.outlets.length <= 1) throw new Error('Cannot delete the last remaining outlet');
     this.outlets = this.outlets.filter(o => o.id !== id);
     this.save(this.outlets);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('outlets').delete().eq('id', id).catch(() => {});
+      } catch (err) {}
+    }
   }
 }
 

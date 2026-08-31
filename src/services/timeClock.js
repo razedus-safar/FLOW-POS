@@ -3,6 +3,8 @@
  * Shift punch in / punch out, break tracking, and wage calculation
  */
 
+import { supabaseClient } from './supabase.js';
+
 const STORAGE_KEY = 'flowpos_time_punches';
 
 export const INITIAL_PUNCHES = [
@@ -82,6 +84,13 @@ class TimeClockService {
 
     this.punches.unshift(newPunch);
     this.save(this.punches);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('time_punches').upsert(newPunch, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return newPunch;
   }
 
@@ -102,6 +111,13 @@ class TimeClockService {
     punch.status = 'COMPLETED';
 
     this.save(this.punches);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        supabaseClient.client.from('time_punches').upsert(punch, { onConflict: 'id' }).catch(() => {});
+      } catch (err) {}
+    }
+
     return punch;
   }
 

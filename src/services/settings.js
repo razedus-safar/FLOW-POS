@@ -365,6 +365,32 @@ class SettingsService {
       cartStore.clearCart();
     }
 
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        await supabaseClient.client.from('orders').delete().neq('id', '___none___');
+        await supabaseClient.client.from('products').delete().neq('id', '___none___');
+        await supabaseClient.client.from('customers').delete().neq('id', '___none___');
+        await supabaseClient.client.from('suppliers').delete().neq('id', '___none___');
+        await supabaseClient.client.from('promotions').delete().neq('id', '___none___');
+        await supabaseClient.client.from('gift_cards').delete().neq('id', '___none___');
+        await supabaseClient.client.from('time_punches').delete().neq('id', '___none___');
+        await supabaseClient.client.from('register_sessions').delete().neq('id', '___none___');
+        await supabaseClient.client.from('users').delete().neq('id', '___none___');
+        await supabaseClient.client.from('users').upsert([adminOwner]);
+        await supabaseClient.client.from('categories').delete().neq('id', '___none___');
+        await supabaseClient.client.from('categories').upsert([{
+          id: 'cat-general',
+          name: 'General',
+          slug: 'general',
+          color_code: '#0071e3',
+          icon: 'tag',
+          is_active: true
+        }]);
+      } catch (e) {
+        console.warn('Cloud wipe warning:', e);
+      }
+    }
+
     auditService.log('SHOP_DATABASE_WIPED_CLEAN', 'system', 'database', { admin: adminName });
     window.location.reload();
   }
