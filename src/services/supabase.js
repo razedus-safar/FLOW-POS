@@ -269,11 +269,14 @@ class SupabaseService {
       localDB.getAll('orders')
     ]);
 
-    const syncTasks = [];
+    // =========================================================================
+    // PHASE 1: Sync Prerequisite Parent Tables (Settings, Users, Categories, Suppliers, Customers)
+    // =========================================================================
+    const phase1Tasks = [];
 
-    // 1. Sync Staff Users & Passwords (Parallel)
+    // 1. Sync Staff Users & Passwords
     if (users.length > 0) {
-      syncTasks.push((async () => {
+      phase1Tasks.push((async () => {
         const payload = users.map(u => ({
           id: String(u.id),
           name: u.name || 'admin',
@@ -303,7 +306,7 @@ class SupabaseService {
 
     // 2. Sync Store Settings & Branding
     if (settingsRaw) {
-      syncTasks.push((async () => {
+      phase1Tasks.push((async () => {
         const parsedSettings = JSON.parse(settingsRaw);
         await this.client.from('settings').upsert({
           key: 'global_settings',
@@ -313,9 +316,9 @@ class SupabaseService {
       })());
     }
 
-    // 3. Sync Categories (Parallel)
+    // 3. Sync Categories (Parent of Products)
     if (categories.length > 0) {
-      syncTasks.push((async () => {
+      phase1Tasks.push((async () => {
         const payload = categories.map(c => ({
           id: String(c.id),
           name: c.name || 'General',
@@ -339,9 +342,9 @@ class SupabaseService {
       })());
     }
 
-    // 4. Sync Suppliers (Parallel)
+    // 4. Sync Suppliers
     if (suppliers.length > 0) {
-      syncTasks.push((async () => {
+      phase1Tasks.push((async () => {
         const payload = suppliers.map(s => ({
           id: String(s.id),
           name: s.name,
@@ -368,46 +371,9 @@ class SupabaseService {
       })());
     }
 
-    // 5. Sync Products (Parallel)
-    if (products.length > 0) {
-      syncTasks.push((async () => {
-        const payload = products.map(p => ({
-          id: String(p.id),
-          name: p.name,
-          description: p.description || '',
-          sku: p.sku || `SKU-${p.id}`,
-          barcode: p.barcode || null,
-          category_id: p.category_id ? String(p.category_id) : null,
-          category_name: p.category_name || '',
-          category_color: p.category_color || '#0071e3',
-          cost_price: Number(p.cost_price) || 0,
-          selling_price: Number(p.selling_price) || 0,
-          tax_rate: Number(p.tax_rate) || 0,
-          stock_quantity: Number(p.stock_quantity) || 0,
-          reorder_level: Number(p.reorder_level) || 5,
-          image_url: p.image_url || '',
-          track_inventory: p.track_inventory !== false,
-          is_active: p.is_active !== false,
-          created_at: p.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-        const { error } = await this.client.from('products').upsert(payload, { onConflict: 'id' });
-        if (error) throw new Error(`Products sync: ${error.message}`);
-
-        const activeProdIds = products.map(p => String(p.id));
-        const { data: cloudProds } = await this.client.from('products').select('id');
-        if (cloudProds && Array.isArray(cloudProds)) {
-          const toDelete = cloudProds.filter(cp => !activeProdIds.includes(cp.id)).map(cp => cp.id);
-          if (toDelete.length > 0) {
-            await this.client.from('products').delete().in('id', toDelete);
-          }
-        }
-      })());
-    }
-
-    // 6. Sync Customers (Parallel)
+    // 5. Sync Customers (Parent of Orders)
     if (customers.length > 0) {
-      syncTasks.push((async () => {
+      phase1Tasks.push((async () => {
         const payload = customers.map(c => ({
           id: String(c.id),
           name: c.name,
@@ -435,30 +401,71 @@ class SupabaseService {
       })());
     }
 
-    // 7. Sync Orders (Parallel)
-    if (orders.length > 0) {
-      syncTasks.push((async () => {
-        const payload = orders.map(o => ({
-          id: String(o.id),
-          order_number: o.order_number || `ORD-${o.id}`,
-          customer_id: o.customer_id ? String(o.customer_id) : null,
-          customer_name: o.customer_name || 'Walk-in Guest',
-          subtotal: Number(o.subtotal) || 0,
-          tax_amount: Number(o.tax_amount) || 0,
-          discount_amount: Number(o.discount_amount) || 0,
-          total_amount: Number(o.total_amount) || 0,
-          payment_method: o.payment_method || 'cash',
-          status: o.status || 'completed',
-          items: o.items || [],
-          created_at: o.created_at || new Date().toISOString()
-        }));
-        const { error } = await this.client.from('orders').upsert(payload, { onConflict: 'id' });
-        if (error) throw new Error(`Orders sync: ${error.message}`);
-      })());
+    // Await Phase 1 (Guarantees Categories and Customers exist in database)
+    await Promise.all(phase1Tasks);
+
+    // =========================================================================
+    // PHASE 2: Sync Products with Validated Category Foreign Keys
+    // =========================================================================
+    const validCatIds = new Set(categories.map(c => String(c.id)));
+
+    if (products.length > 0) {
+      const payload = products.map(p => ({
+        id: String(p.id),
+        name: p.name,
+        description: p.description || '',
+        sku: p.sku || `SKU-${p.id}`,
+        barcode: p.barcode || null,
+        category_id: (p.category_id && validCatIds.has(String(p.category_id))) ? String(p.category_id) : null,
+        category_name: p.category_name || '',
+        category_color: p.category_color || '#0071e3',
+        cost_price: Number(p.cost_price) || 0,
+        selling_price: Number(p.selling_price) || 0,
+        tax_rate: Number(p.tax_rate) || 0,
+        stock_quantity: Number(p.stock_quantity) || 0,
+        reorder_level: Number(p.reorder_level) || 5,
+        image_url: p.image_url || '',
+        track_inventory: p.track_inventory !== false,
+        is_active: p.is_active !== false,
+        created_at: p.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      const { error } = await this.client.from('products').upsert(payload, { onConflict: 'id' });
+      if (error) throw new Error(`Products sync: ${error.message}`);
+
+      const activeProdIds = products.map(p => String(p.id));
+      const { data: cloudProds } = await this.client.from('products').select('id');
+      if (cloudProds && Array.isArray(cloudProds)) {
+        const toDelete = cloudProds.filter(cp => !activeProdIds.includes(cp.id)).map(cp => cp.id);
+        if (toDelete.length > 0) {
+          await this.client.from('products').delete().in('id', toDelete);
+        }
+      }
     }
 
-    // Await all parallel tasks concurrently
-    await Promise.all(syncTasks);
+    // =========================================================================
+    // PHASE 3: Sync Orders with Validated Customer Foreign Keys
+    // =========================================================================
+    const validCustIds = new Set(customers.map(c => String(c.id)));
+
+    if (orders.length > 0) {
+      const payload = orders.map(o => ({
+        id: String(o.id),
+        order_number: o.order_number || `ORD-${o.id}`,
+        customer_id: (o.customer_id && validCustIds.has(String(o.customer_id))) ? String(o.customer_id) : null,
+        customer_name: o.customer_name || 'Walk-in Guest',
+        subtotal: Number(o.subtotal) || 0,
+        tax_amount: Number(o.tax_amount) || 0,
+        discount_amount: Number(o.discount_amount) || 0,
+        total_amount: Number(o.total_amount) || 0,
+        payment_method: o.payment_method || 'cash',
+        status: o.status || 'completed',
+        items: o.items || [],
+        created_at: o.created_at || new Date().toISOString()
+      }));
+      const { error } = await this.client.from('orders').upsert(payload, { onConflict: 'id' });
+      if (error) throw new Error(`Orders sync: ${error.message}`);
+    }
     const elapsed = Math.round(performance.now() - start);
 
     this.logSyncEvent({

@@ -503,6 +503,11 @@ class ProductService {
       return;
     }
 
+    // When connected to Supabase cloud, rely on Cloud pull as source of truth and do not auto-inject demo data
+    if (supabaseClient.isConfigured()) {
+      return;
+    }
+
     const existingCats = await localDB.getAll('categories');
     if (existingCats.length === 0) {
       await localDB.putMany('categories', INITIAL_CATEGORIES);
@@ -512,15 +517,6 @@ class ProductService {
       await localDB.putMany('products', INITIAL_PRODUCTS);
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('flowpos_db_seeded', 'true');
-      }
-    } else {
-      // Auto-migrate legacy small USD catalog prices (< 100) to LKR base
-      for (const p of existingProds) {
-        if (p.selling_price > 0 && p.selling_price < 80) {
-          p.selling_price = Math.round((p.selling_price * 250) / 50) * 50;
-          p.cost_price = Math.round(((p.cost_price || p.selling_price * 0.5) * 250) / 50) * 50;
-          await localDB.put('products', p);
-        }
       }
     }
   }
