@@ -20,7 +20,7 @@ export function createProductCard(product, onAddToCart) {
   const hasCustomizations = (product.variants && product.variants.length > 0) || (product.modifiers && product.modifiers.length > 0);
 
   const card = document.createElement('article');
-  card.className = `product group relative flex flex-col justify-between rounded-[20px] p-3 sm:p-3.5 glass-card border border-[var(--line)] transition-all duration-200 overflow-hidden select-none ${isCardDisabled ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer active:scale-98 hover:shadow-md'}`;
+  card.className = `product group relative flex flex-col justify-between rounded-[20px] p-3 sm:p-3.5 glass-card border border-[var(--line)] transition-all duration-200 overflow-hidden select-none ${isCardDisabled ? 'opacity-40 grayscale cursor-not-allowed' : 'cursor-pointer active:scale-98 hover:shadow-md'}`;
   card.setAttribute('data-product-id', product.id);
 
   const imgSrc = product.image_url || 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=500&auto=format&fit=crop&q=80';
@@ -38,7 +38,7 @@ export function createProductCard(product, onAddToCart) {
         src="${imgSrc}"
         alt="${product.name}"
         loading="lazy"
-        class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+        class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300 ${isCardDisabled ? 'filter grayscale contrast-75' : ''}"
         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
       />
       <div class="hidden w-full h-full items-center justify-center text-3xl">
@@ -48,11 +48,11 @@ export function createProductCard(product, onAddToCart) {
       <!-- Single Floating Stock Badge at Top-Right (No overlap) -->
       ${showStockBadges ? `
         <span class="stock absolute top-2 right-2 badge text-[9.5px] px-2 py-0.5 shadow-sm font-bold ${isOutOfStock ? 'badge-danger' : isLowStock ? 'badge-amber' : 'badge-emerald'}">
-          ${isOutOfStock ? 'Out of stock' : `${product.stock_quantity} in stock`}
+          ${isOutOfStock ? 'OUT OF STOCK' : `${product.stock_quantity} in stock`}
         </span>
       ` : ''}
 
-      ${hasCustomizations ? `
+      ${hasCustomizations && !isCardDisabled ? `
         <span class="absolute bottom-2 left-2 badge badge-platinum text-[9px] px-2 py-0.5 font-extrabold shadow-sm">
           ⚙ Options
         </span>
@@ -84,10 +84,11 @@ export function createProductCard(product, onAddToCart) {
         <button
           type="button"
           data-add-btn="${product.id}"
-          class="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] sm:rounded-[12px] bg-[var(--accent)] text-white flex items-center justify-center hover:opacity-90 active:scale-90 transition-transform shadow-xs flex-shrink-0"
-          title="${hasCustomizations ? 'Customize options' : 'Add to Cart'}"
+          ${isCardDisabled ? 'disabled' : ''}
+          class="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] sm:rounded-[12px] ${isCardDisabled ? 'bg-slate-300 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50 shadow-none' : 'bg-[var(--accent)] text-white hover:opacity-90 active:scale-90 shadow-xs'} flex items-center justify-center transition-transform flex-shrink-0"
+          title="${isCardDisabled ? 'Out of stock' : hasCustomizations ? 'Customize options' : 'Add to Cart'}"
         >
-          ${renderIcon(hasCustomizations ? 'sliders' : 'plus', 'w-4 h-4')}
+          ${renderIcon(hasCustomizations && !isCardDisabled ? 'sliders' : 'plus', 'w-4 h-4')}
         </button>
       </div>
     </div>
@@ -104,15 +105,17 @@ export function createProductCard(product, onAddToCart) {
     }
   };
 
-  // Attach card click handlers
-  card.addEventListener('click', handleAction);
+  // Attach card click handlers only if not disabled
+  if (!isCardDisabled) {
+    card.addEventListener('click', handleAction);
 
-  const addBtn = card.querySelector('[data-add-btn]');
-  if (addBtn) {
-    addBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handleAction();
-    });
+    const addBtn = card.querySelector('[data-add-btn]');
+    if (addBtn) {
+      addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleAction();
+      });
+    }
   }
 
   return card;

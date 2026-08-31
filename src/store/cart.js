@@ -1,9 +1,7 @@
-/**
- * FlowPOS Real-Time Cart Store
- */
-
 import { globalStore } from './state.js';
 import { customerDisplayService } from '../services/customerDisplay.js';
+import { settingsService } from '../services/settings.js';
+import { toast } from '../components/Toast.js';
 
 class CartStore {
   constructor() {
@@ -37,10 +35,29 @@ class CartStore {
   }
 
   addItem(product, qty = 1) {
+    const hasStockField = product.stock_quantity !== undefined && product.stock_quantity !== null;
+    const stock = Number(product.stock_quantity);
+    const settings = settingsService.get();
+    const allowNegative = Boolean(settings?.workspace?.allowNegativeInventory || settings?.checkout?.allowNegativeInventory);
+
+    if (hasStockField && stock <= 0 && !allowNegative) {
+      toast.warning(`"${product.name}" is out of stock.`);
+      return false;
+    }
+
     const existingIndex = this.items.findIndex(item => item.product.id === product.id);
     if (existingIndex > -1) {
+      const currentQty = Number(this.items[existingIndex].quantity) || 0;
+      if (hasStockField && !allowNegative && (currentQty + qty) > stock) {
+        toast.warning(`Cannot add more "${product.name}" (${stock} in stock).`);
+        return false;
+      }
       this.items[existingIndex].quantity += qty;
     } else {
+      if (hasStockField && !allowNegative && qty > stock) {
+        toast.warning(`Cannot add more "${product.name}" (${stock} in stock).`);
+        return false;
+      }
       this.items.push({
         id: `cart-item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         product: { ...product },
@@ -50,6 +67,7 @@ class CartStore {
       });
     }
     this.notify();
+    return true;
   }
 
   updateQuantity(productId, newQty) {
@@ -59,6 +77,16 @@ class CartStore {
       if (num <= 0) {
         this.items.splice(index, 1);
       } else {
+        const item = this.items[index];
+        const hasStockField = item.product.stock_quantity !== undefined && item.product.stock_quantity !== null;
+        const stock = Number(item.product.stock_quantity);
+        const settings = settingsService.get();
+        const allowNegative = Boolean(settings?.workspace?.allowNegativeInventory || settings?.checkout?.allowNegativeInventory);
+
+        if (hasStockField && !allowNegative && num > stock) {
+          toast.warning(`Cannot set quantity higher than available stock (${stock} in stock).`);
+          return;
+        }
         this.items[index].quantity = num;
       }
       this.notify();
@@ -73,6 +101,16 @@ class CartStore {
       if (next <= 0) {
         this.items.splice(index, 1);
       } else {
+        const item = this.items[index];
+        const hasStockField = item.product.stock_quantity !== undefined && item.product.stock_quantity !== null;
+        const stock = Number(item.product.stock_quantity);
+        const settings = settingsService.get();
+        const allowNegative = Boolean(settings?.workspace?.allowNegativeInventory || settings?.checkout?.allowNegativeInventory);
+
+        if (delta > 0 && hasStockField && !allowNegative && next > stock) {
+          toast.warning(`Maximum available stock reached for "${item.product.name}" (${stock} in stock).`);
+          return;
+        }
         this.items[index].quantity = next;
       }
       this.notify();

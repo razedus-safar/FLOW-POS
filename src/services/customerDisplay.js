@@ -2,7 +2,7 @@
  * FlowPOS Real-Time Customer-Facing Display Channel
  * Syncs cart, total, store promotions, and payment QR code to secondary screens
  * Supports BroadcastChannel (same-tab/window), localStorage (cross-window),
- * and Supabase Realtime (cross-device iPad/mobile secondary screens).
+ * Supabase Postgres Changes & Realtime Broadcast (cross-device internet sync).
  */
 
 import { supabaseClient } from './supabase.js';
@@ -11,6 +11,7 @@ class CustomerDisplayService {
   constructor() {
     this.channel = null;
     this.supabaseChannel = null;
+    this.postgresChannel = null;
     this.initChannels();
   }
 
@@ -24,7 +25,7 @@ class CustomerDisplayService {
       console.warn('BroadcastChannel not supported in this environment');
     }
 
-    // 2. Cross-Device Cloud Realtime Channel via Supabase
+    // 2. Cross-Device Cloud Realtime Channels via Supabase
     this.initSupabaseRealtime();
   }
 
@@ -33,7 +34,7 @@ class CustomerDisplayService {
     if (supabaseClient.isConfigured() && !this.supabaseChannel) {
       try {
         this.supabaseChannel = supabaseClient.client.channel('flowpos_customer_display_feed', {
-          config: { broadcast: { self: false } }
+          config: { broadcast: { self: true } }
         });
         this.supabaseChannel.subscribe();
       } catch (err) {
@@ -68,7 +69,7 @@ class CustomerDisplayService {
       window.dispatchEvent(new CustomEvent('flowpos:customer-display', { detail: { type, payload } }));
     }
 
-    // 4. Cross-Device Supabase Realtime Broadcast (Multi-device POS <-> Customer Screen)
+    // 4. Cross-Device Supabase Realtime Broadcast (Instant WebSocket)
     if (this.supabaseChannel) {
       try {
         this.supabaseChannel.send({
@@ -89,6 +90,28 @@ class CustomerDisplayService {
             payload
           });
         } catch {}
+      }
+    }
+
+    // 5. Cloud Database Table Persistence (Internet multi-device sync guarantee)
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured() && typeof window !== 'undefined') {
+      const timestamp = new Date().toISOString();
+      if (type === 'CART_UPDATED') {
+        Promise.resolve(
+          supabaseClient.client.from('settings').upsert({
+            key: 'active_customer_cart',
+            value: { payload, timestamp },
+            updated_at: timestamp
+          }, { onConflict: 'key' })
+        ).catch(err => console.warn('Cloud active cart upsert warning:', err));
+      } else if (type === 'CHECKOUT_COMPLETED') {
+        Promise.resolve(
+          supabaseClient.client.from('settings').upsert({
+            key: 'active_customer_completed',
+            value: { payload, timestamp },
+            updated_at: timestamp
+          }, { onConflict: 'key' })
+        ).catch(err => console.warn('Cloud checkout completed upsert warning:', err));
       }
     }
   }
@@ -146,13 +169,62 @@ class CustomerDisplayService {
 
       this.supabaseChannel.on('broadcast', { event: 'CART_UPDATED' }, cartHandler);
       this.supabaseChannel.on('broadcast', { event: 'CHECKOUT_COMPLETED' }, checkoutHandler);
+    }
 
-      unsubscribers.push(() => {
-        if (this.supabaseChannel) {
-          this.supabaseChannel.unsubscribe();
-          this.supabaseChannel = null;
+    // 4. Supabase Postgres Changes Channel on settings table
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        const pgChannel = supabaseClient.client.channel('public:settings:customer_display')
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'settings',
+            filter: 'key=in.(active_customer_cart,active_customer_completed)'
+          }, (event) => {
+            const row = event.new;
+            if (!row || !row.value) return;
+            if (row.key === 'active_customer_cart') {
+              const cart = row.value.payload || row.value;
+              callback('CART_UPDATED', cart);
+            } else if (row.key === 'active_customer_completed') {
+              const comp = row.value.payload || row.value;
+              callback('CHECKOUT_COMPLETED', comp);
+            }
+          })
+          .subscribe();
+
+        unsubscribers.push(() => {
+          if (pgChannel) pgChannel.unsubscribe();
+        });
+      } catch (err) {
+        console.warn('Postgres changes channel warning:', err);
+      }
+
+      // 5. Active Heartbeat Polling Fallback (every 2.5s) for zero-drop internet sync
+      let lastFetchedCartStr = '';
+      const pollTimer = setInterval(async () => {
+        if (!supabaseClient.isConfigured()) return;
+        try {
+          const { data } = await supabaseClient.client
+            .from('settings')
+            .select('key, value, updated_at')
+            .eq('key', 'active_customer_cart')
+            .maybeSingle();
+
+          if (data && data.value) {
+            const cartPayload = data.value.payload || data.value;
+            const currentStr = JSON.stringify(cartPayload);
+            if (currentStr !== lastFetchedCartStr) {
+              lastFetchedCartStr = currentStr;
+              callback('CART_UPDATED', cartPayload);
+            }
+          }
+        } catch (e) {
+          // ignore transient poll error
         }
-      });
+      }, 2500);
+
+      unsubscribers.push(() => clearInterval(pollTimer));
     }
 
     return () => {
@@ -160,13 +232,30 @@ class CustomerDisplayService {
     };
   }
 
-  getLatestCart() {
+  async getLatestCart() {
+    // 1. Check local storage
     if (typeof localStorage !== 'undefined') {
       try {
         const stored = localStorage.getItem('flowpos_customer_display_cart');
         if (stored) return JSON.parse(stored);
       } catch {}
     }
+
+    // 2. Check cloud database
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      try {
+        const { data } = await supabaseClient.client
+          .from('settings')
+          .select('value')
+          .eq('key', 'active_customer_cart')
+          .maybeSingle();
+
+        if (data && data.value) {
+          return data.value.payload || data.value;
+        }
+      } catch {}
+    }
+
     return null;
   }
 

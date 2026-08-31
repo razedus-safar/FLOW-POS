@@ -399,9 +399,11 @@ export class POSPage {
     const fragment = document.createDocumentFragment();
     productsList.forEach(prod => {
       const card = createProductCard(prod, (p) => {
-        cartStore.addItem(p, 1);
-        soundManager.playBeep();
-        toast.success(`Added ${p.name}`);
+        const added = cartStore.addItem(p, 1);
+        if (added) {
+          soundManager.playBeep();
+          toast.success(`Added ${p.name}`);
+        }
       });
       fragment.appendChild(card);
     });

@@ -19,10 +19,20 @@ export class CustomerDisplayPage {
     this.init();
   }
 
-  init() {
+  async init() {
     this.render();
 
-    // Listen for customer display broadcasts
+    try {
+      const initialCart = await customerDisplayService.getLatestCart();
+      if (initialCart && initialCart.items) {
+        this.cartData = initialCart;
+        this.render();
+      }
+    } catch (e) {
+      console.warn('Failed to load initial cloud cart:', e);
+    }
+
+    // Listen for customer display broadcasts (BroadcastChannel, localStorage, Supabase Realtime, Postgres Changes & Polling)
     this.unsubscribe = customerDisplayService.subscribe((type, payload) => {
       if (type === 'CART_UPDATED') {
         this.cartData = payload;
@@ -32,7 +42,7 @@ export class CustomerDisplayPage {
       }
     });
 
-    // Listen to real-time global cart store
+    // Listen to real-time global cart store (same window)
     this.unsubscribeCart = globalStore.subscribe('cart', (state) => {
       if (state) {
         this.cartData = state;
