@@ -757,7 +757,7 @@ export class SettingsPage {
         { name: 'gift_cards', label: 'Gift Cards & Vouchers', primaryKey: 'id' },
         { name: 'outlets', label: 'Store Locations & Warehouses', primaryKey: 'id' },
         { name: 'time_punches', label: 'Staff Time Clock Punches', primaryKey: 'id' },
-        { name: 'register_sessions', label: 'Register Drawer Shifts', primaryKey: 'id' }
+        { name: 'inventory_movements', label: 'Inventory Stock Movements', primaryKey: 'id' }
       ];
 
       const initialTableCardsHtml = (this.lastVerificationResults?.tables || defaultTables).map(t => {

@@ -196,6 +196,33 @@ CREATE TABLE IF NOT EXISTS outlets (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 13. REGISTERS & CASH DRAWERS
+CREATE TABLE IF NOT EXISTS registers (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(50),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. REGISTER SESSIONS (Shifts & Cash Floats)
+CREATE TABLE IF NOT EXISTS register_sessions (
+  id VARCHAR(255) PRIMARY KEY,
+  register_id VARCHAR(255),
+  user_id VARCHAR(255),
+  user_name VARCHAR(255),
+  opening_cash NUMERIC(12, 2) DEFAULT 0.00,
+  closing_cash NUMERIC(12, 2),
+  expected_cash NUMERIC(12, 2),
+  total_cash_sales NUMERIC(12, 2) DEFAULT 0.00,
+  total_card_sales NUMERIC(12, 2) DEFAULT 0.00,
+  total_mobile_sales NUMERIC(12, 2) DEFAULT 0.00,
+  status VARCHAR(50) DEFAULT 'open',
+  notes TEXT,
+  opened_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_at TIMESTAMPTZ
+);
+
 -- ==========================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- Full client read & write access for anon & authenticated
@@ -212,6 +239,8 @@ ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gift_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE time_punches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outlets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE registers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE register_sessions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all users" ON users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all settings" ON settings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
@@ -225,6 +254,8 @@ CREATE POLICY "Allow all promotions" ON promotions FOR ALL TO anon, authenticate
 CREATE POLICY "Allow all gift_cards" ON gift_cards FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all time_punches" ON time_punches FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all outlets" ON outlets FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all registers" ON registers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all register_sessions" ON register_sessions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- Enable Supabase Realtime across all relevant POS tables
 ALTER PUBLICATION supabase_realtime ADD TABLE users, settings, products, categories, orders, customers;
