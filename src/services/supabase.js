@@ -352,7 +352,7 @@ class SupabaseService {
 
       if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
         localStorage.setItem('flowpos_staff_users', JSON.stringify(cloudUsers));
-        dbTasks.push(localDB.putMany('users', cloudUsers));
+        dbTasks.push(localDB.clear('users').then(() => localDB.putMany('users', cloudUsers)));
       }
 
       if (cloudSettings?.value) {
@@ -363,29 +363,31 @@ class SupabaseService {
       }
 
       if (Array.isArray(cloudCats) && cloudCats.length > 0) {
-        dbTasks.push(localDB.putMany('categories', cloudCats));
+        dbTasks.push(localDB.clear('categories').then(() => localDB.putMany('categories', cloudCats)));
       }
 
       if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-        dbTasks.push(localDB.putMany('products', cloudProds));
+        dbTasks.push(localDB.clear('products').then(() => localDB.putMany('products', cloudProds)));
       }
 
       if (Array.isArray(cloudCusts) && cloudCusts.length > 0) {
-        dbTasks.push(localDB.putMany('customers', cloudCusts));
+        dbTasks.push(localDB.clear('customers').then(() => localDB.putMany('customers', cloudCusts)));
       }
 
       if (Array.isArray(cloudSupps) && cloudSupps.length > 0) {
-        dbTasks.push(localDB.putMany('suppliers', cloudSupps));
+        dbTasks.push(localDB.clear('suppliers').then(() => localDB.putMany('suppliers', cloudSupps)));
       }
 
       if (Array.isArray(cloudOrders) && cloudOrders.length > 0) {
-        dbTasks.push(localDB.putMany('orders', cloudOrders));
+        dbTasks.push(localDB.clear('orders').then(() => localDB.putMany('orders', cloudOrders)));
       }
 
       await Promise.all(dbTasks);
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('flowpos:cloud-pulled'));
+        window.dispatchEvent(new CustomEvent('flowpos:user-updated'));
+        window.dispatchEvent(new CustomEvent('flowpos:products-updated'));
       }
 
       return {

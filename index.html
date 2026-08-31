@@ -57,13 +57,13 @@
   }
   </script>
 </head>
-<body class="h-full antialiased font-sans text-[var(--text)] selection:bg-[#007AFF]/25 selection:text-[#007AFF] overflow-hidden" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+<body class="min-h-full antialiased font-sans text-[var(--text)] selection:bg-[#007AFF]/25 selection:text-[#007AFF] bg-[var(--bg)]" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
   <!-- Accessibility Skip Link -->
   <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[1000] focus:px-4 focus:py-2 focus:bg-[#007AFF] focus:text-white focus:font-bold focus:rounded-[14px] focus:shadow-2xl">
     Skip to Main Content
   </a>
 
-  <div id="app" class="h-full w-full flex overflow-hidden"></div>
+  <div id="app" class="min-h-screen w-full flex flex-col"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

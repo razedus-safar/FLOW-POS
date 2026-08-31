@@ -69,7 +69,7 @@ export class App {
     this.init();
   }
 
-  init() {
+  async init() {
     window.addEventListener('flowpos:auth-logout', () => {
       this.render();
     });
@@ -81,13 +81,28 @@ export class App {
       this.render();
     });
 
-    // Auto-sync & Pull latest store data & staff credentials from Supabase in background
+    // Mobile Sidebar Drawer Toggle Event
+    window.addEventListener('flowpos:toggle-mobile-sidebar', () => {
+      const sidebarContainer = this.root.querySelector('#app-sidebar-container');
+      const backdrop = this.root.querySelector('#mobile-sidebar-backdrop');
+      if (sidebarContainer && backdrop) {
+        sidebarContainer.classList.toggle('-translate-x-full');
+        backdrop.classList.toggle('hidden');
+      }
+    });
+
+    // Auto-sync & Pull latest store data & staff credentials from Supabase
     if (supabaseClient.isConfigured()) {
-      supabaseClient.pullFromCloud().then(res => {
-        if (res.success && res.users > 0) {
-          sessionManager.loadUsers();
-        }
-      });
+      try {
+        // Fast initial pull with 600ms race so device renders fresh cloud data immediately
+        await Promise.race([
+          supabaseClient.pullFromCloud(),
+          new Promise(r => setTimeout(r, 600))
+        ]);
+        sessionManager.loadUsers();
+      } catch (err) {
+        console.warn('Initial cloud pull failed:', err);
+      }
 
       let realtimeTimeout = null;
       supabaseClient.subscribeRealtime((table) => {
@@ -102,16 +117,6 @@ export class App {
         }, 150);
       });
     }
-
-    // Mobile Sidebar Drawer Toggle Event
-    window.addEventListener('flowpos:toggle-mobile-sidebar', () => {
-      const sidebarContainer = this.root.querySelector('#app-sidebar-container');
-      const backdrop = this.root.querySelector('#mobile-sidebar-backdrop');
-      if (sidebarContainer && backdrop) {
-        sidebarContainer.classList.toggle('-translate-x-full');
-        backdrop.classList.toggle('hidden');
-      }
-    });
 
     this.render();
   }
