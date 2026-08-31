@@ -16,6 +16,7 @@ import { soundManager } from '../utils/audio.js';
 import { CameraScannerModal } from '../components/CameraScannerModal.js';
 import { hardwarePrinter } from '../services/printer.js';
 import { customerDisplayService } from '../services/customerDisplay.js';
+import { sanitizeHtml } from '../utils/security.js';
 
 const WORKSPACE_OPTIONS = [
   {
@@ -81,16 +82,26 @@ export class SettingsPage {
     const currentAccent = themeManager.getAccent();
     const currentFont = themeManager.getFont();
 
+    const currentUser = sessionManager.getUser();
+    const isOwner = currentUser && (currentUser.role === 'OWNER' || currentUser.name?.toLowerCase() === 'admin' || currentUser.name?.toLowerCase() === 'safar');
+
     const tabs = [
       { id: 'appearance', label: 'Appearance & Themes', icon: 'sun' },
       { id: 'store', label: 'Store & Branding', icon: 'shopping-bag' },
       { id: 'checkout', label: 'Currency, Tax & Pricing', icon: 'receipt' },
       { id: 'pos_behaviors', label: 'POS & Register Rules', icon: 'sliders' },
       { id: 'hardware', label: 'Hardware & Devices', icon: 'scan' },
-      { id: 'cloud', label: 'Cloud Multi-Store', icon: 'server' },
+      { id: 'cloud', label: 'Cloud Multi-Store', icon: 'server' }
+    ];
+
+    if (isOwner) {
+      tabs.push({ id: 'cloud_logs', label: 'Cloud Logs & Live Audit', icon: 'activity' });
+    }
+
+    tabs.push(
       { id: 'security', label: 'Admin Security & PINs', icon: 'shield' },
       { id: 'data', label: 'Data & Backup', icon: 'download' }
-    ];
+    );
 
     const tabsNavHtml = tabs.map(t => `
       <button data-settings-tab="${t.id}" class="setting-tab flex items-center space-x-2.5 px-3.5 py-2.5 rounded-[14px] text-xs font-bold transition-all duration-150 text-left ${this.activeSection === t.id ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-black border border-[var(--accent)]/30' : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-white/40 dark:hover:bg-white/5'}">
@@ -729,6 +740,149 @@ export class SettingsPage {
             <div id="cloud-test-result" class="hidden p-3 rounded-[12px] text-xs font-mono"></div>
           </div>
         </form>
+      `;
+    } else if (this.activeSection === 'cloud_logs') {
+      const logs = supabaseClient.getSyncLogs();
+      const isCloudConfigured = supabaseClient.isConfigured();
+
+      const defaultTables = [
+        { name: 'products', label: 'Product Catalog', primaryKey: 'id' },
+        { name: 'categories', label: 'Product Categories', primaryKey: 'id' },
+        { name: 'users', label: 'Staff Accounts & Passwords', primaryKey: 'id' },
+        { name: 'customers', label: 'Customer Profiles & Loyalty', primaryKey: 'id' },
+        { name: 'suppliers', label: 'Suppliers & Vendors', primaryKey: 'id' },
+        { name: 'orders', label: 'Sales Orders & Invoices', primaryKey: 'id' },
+        { name: 'settings', label: 'Global Store Settings', primaryKey: 'key' },
+        { name: 'promotions', label: 'Discounts & Promotions', primaryKey: 'id' },
+        { name: 'gift_cards', label: 'Gift Cards & Vouchers', primaryKey: 'id' },
+        { name: 'outlets', label: 'Store Locations & Warehouses', primaryKey: 'id' },
+        { name: 'time_punches', label: 'Staff Time Clock Punches', primaryKey: 'id' },
+        { name: 'register_sessions', label: 'Register Drawer Shifts', primaryKey: 'id' }
+      ];
+
+      const initialTableCardsHtml = (this.lastVerificationResults?.tables || defaultTables).map(t => {
+        const status = t.status || 'UNVERIFIED';
+        const rows = t.rows !== undefined ? t.rows : '—';
+        const latency = t.latency !== undefined ? `${t.latency}ms` : '—';
+        const isHealthy = status === 'HEALTHY';
+        const isErr = status === 'ERROR';
+
+        return `
+          <div class="p-3 rounded-[16px] glass-card border border-[var(--line)] flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-black text-[var(--text)]">${t.name}</span>
+              <span class="badge ${isHealthy ? 'badge-emerald' : isErr ? 'badge-amber' : 'badge-blue'} text-[9px] px-1.5 py-0.5">
+                ${status}
+              </span>
+            </div>
+            <div class="text-[10.5px] text-[var(--muted)] truncate font-medium">${t.label}</div>
+            <div class="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-[var(--line)]/50 text-[var(--muted)]">
+              <span>Rows: <strong class="text-[var(--text)] font-bold">${rows}</strong></span>
+              <span>⚡ ${latency}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const logRowsHtml = logs.length === 0 ? `
+        <div class="p-8 text-center text-xs text-[var(--muted)] font-medium">
+          No cloud sync events recorded yet. Run a verification or sync action above to start logging.
+        </div>
+      ` : logs.map(l => {
+        const dateStr = new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const isSuccess = l.status === 'SUCCESS';
+        const isError = l.status === 'ERROR';
+
+        return `
+          <div class="p-3 rounded-[14px] glass-card border border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition hover:border-[var(--accent)]/40" data-log-item-type="${l.type}">
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="text-xs font-mono text-[var(--muted)] flex-shrink-0">${dateStr}</span>
+              <span class="badge ${isSuccess ? 'badge-emerald' : isError ? 'badge-amber' : 'badge-blue'} text-[9px] px-2 py-0.5 flex-shrink-0 font-mono">
+                ${l.type}
+              </span>
+              <span class="text-xs font-bold text-[var(--text)] truncate">${sanitizeHtml(l.message || l.table)}</span>
+            </div>
+            <div class="flex items-center space-x-3 text-xs font-mono text-[var(--muted)] flex-shrink-0 justify-between sm:justify-end">
+              <span>${l.count > 0 ? `${l.count} items` : ''}</span>
+              <span>⚡ ${l.latency}ms</span>
+              <button type="button" data-inspect-log-id="${l.id}" class="px-2.5 py-1 rounded-[8px] text-[10px] font-bold glass-btn-secondary active:scale-95 transition">
+                Inspect Payload
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      contentHtml = `
+        <div class="space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center space-x-2">
+                <h3 class="font-black font-heading text-sm text-[var(--text)]">Supabase Cloud Sync & Real-Time Audit</h3>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                  Admin Exclusive
+                </span>
+              </div>
+              <p class="text-xs text-[var(--muted)] font-medium mt-0.5">Live database synchronization history, latency benchmarks, and full table integrity verification.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="reverify-cloud-tables-btn" class="px-4 py-2 rounded-[12px] text-xs font-black glass-btn-primary shadow-sm flex items-center space-x-1.5 active:scale-96 transition">
+                <span>⚡</span>
+                <span>Re-verify All Tables</span>
+              </button>
+              <button type="button" id="export-cloud-logs-btn" class="px-3 py-2 rounded-[12px] text-xs font-bold glass-btn-secondary active:scale-96 transition" title="Export logs as JSON">
+                <span>📥 Export</span>
+              </button>
+              <button type="button" id="clear-cloud-logs-btn" class="px-3 py-2 rounded-[12px] text-xs font-bold glass-btn-secondary text-[var(--red)] active:scale-96 transition" title="Clear log history">
+                <span>🗑️ Clear</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Re-verification Results Card -->
+          <div class="p-4 sm:p-5 rounded-[22px] glass-card border border-[var(--line)] space-y-3 shadow-xs">
+            <div class="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
+              <div class="flex items-center space-x-2">
+                <span class="text-base">🛡️</span>
+                <span class="text-xs font-black text-[var(--text)] uppercase tracking-wider">Cloud Database Schema Health & Row Counts</span>
+              </div>
+              <span id="verification-summary-pill" class="text-[11px] font-bold text-[var(--muted)] font-mono">
+                ${this.lastVerificationResults ? `✓ ${this.lastVerificationResults.healthyCount}/${this.lastVerificationResults.totalTables} Healthy (${this.lastVerificationResults.totalLatency}ms)` : '12 Cloud Tables Monitored'}
+              </span>
+            </div>
+
+            <div id="table-verification-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              ${initialTableCardsHtml}
+            </div>
+          </div>
+
+          <!-- Real-Time Activity Log Stream -->
+          <div class="p-4 sm:p-5 rounded-[22px] glass-card border border-[var(--line)] space-y-3 shadow-xs">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--line)] pb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-base">📜</span>
+                <span class="text-xs font-black text-[var(--text)] uppercase tracking-wider">Live Sync Activity Feed</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-bold">${logs.length} logged events</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <select id="cloud-log-filter" class="h-8 px-2.5 rounded-[10px] glass-input text-[11px] font-bold bg-[var(--card-bg)] border border-[var(--line)]">
+                  <option value="ALL">All Event Types</option>
+                  <option value="PUSH_ALL">Push All</option>
+                  <option value="PULL_ALL">Pull All</option>
+                  <option value="REALTIME">Realtime Mesh</option>
+                  <option value="VERIFY_ALL_TABLES">Table Verify</option>
+                  <option value="CONNECTION_TEST">Connection Test</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="max-h-96 overflow-y-auto space-y-2 pr-1 scrollbar-none" id="cloud-logs-stream">
+              ${logRowsHtml}
+            </div>
+          </div>
+        </div>
       `;
     } else if (this.activeSection === 'checkout') {
       const cur = this.settings.currency || getCurrencyConfig();
@@ -1408,6 +1562,100 @@ export class SettingsPage {
         }
       });
     }
+
+    // Re-verify All Cloud Tables
+    const reverifyBtn = this.container.querySelector('#reverify-cloud-tables-btn');
+    if (reverifyBtn) {
+      reverifyBtn.addEventListener('click', async () => {
+        reverifyBtn.disabled = true;
+        reverifyBtn.textContent = 'Verifying All Tables…';
+        try {
+          const report = await supabaseClient.verifyAllCloudTables();
+          this.lastVerificationResults = report;
+          toast.success(`Verified ${report.healthyCount}/${report.totalTables} cloud tables (${report.totalLatency}ms)`);
+          this.render();
+          this.attachEvents();
+        } catch (err) {
+          toast.error(err.message || 'Table verification failed');
+          reverifyBtn.disabled = false;
+          reverifyBtn.textContent = '⚡ Re-verify All Tables';
+        }
+      });
+    }
+
+    // Clear Cloud Logs
+    const clearLogsBtn = this.container.querySelector('#clear-cloud-logs-btn');
+    if (clearLogsBtn) {
+      clearLogsBtn.addEventListener('click', () => {
+        supabaseClient.clearSyncLogs();
+        toast.info('Cleared cloud sync log history');
+        this.render();
+        this.attachEvents();
+      });
+    }
+
+    // Export Cloud Logs
+    const exportLogsBtn = this.container.querySelector('#export-cloud-logs-btn');
+    if (exportLogsBtn) {
+      exportLogsBtn.addEventListener('click', () => {
+        const logs = supabaseClient.getSyncLogs();
+        const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flowpos-cloud-logs-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Downloaded sync logs as JSON');
+      });
+    }
+
+    // Log Filter
+    const logFilter = this.container.querySelector('#cloud-log-filter');
+    if (logFilter) {
+      logFilter.addEventListener('change', (e) => {
+        const filterVal = e.target.value;
+        this.container.querySelectorAll('[data-log-item-type]').forEach(el => {
+          if (filterVal === 'ALL' || el.getAttribute('data-log-item-type') === filterVal) {
+            el.style.display = 'flex';
+          } else {
+            el.style.display = 'none';
+          }
+        });
+      });
+    }
+
+    // Inspect Payload Modal
+    this.container.querySelectorAll('[data-inspect-log-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const logId = btn.getAttribute('data-inspect-log-id');
+        const logs = supabaseClient.getSyncLogs();
+        const log = logs.find(l => l.id === logId);
+        if (!log) return;
+
+        const modal = new Modal({
+          title: `Log Details: ${log.type} (${new Date(log.timestamp).toLocaleTimeString()})`,
+          size: 'lg',
+          content: `
+            <div class="space-y-4 text-xs font-mono">
+              <div class="grid grid-cols-2 gap-2 p-3 rounded-[12px] glass-card">
+                <div><strong>Event Type:</strong> ${log.type}</div>
+                <div><strong>Status:</strong> ${log.status}</div>
+                <div><strong>Latency:</strong> ${log.latency}ms</div>
+                <div><strong>Table:</strong> ${log.table}</div>
+                <div class="col-span-2"><strong>Timestamp:</strong> ${log.timestamp}</div>
+                <div class="col-span-2"><strong>Message:</strong> ${sanitizeHtml(log.message || '—')}</div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-[var(--text)] mb-1">Payload / Details Data</label>
+                <pre class="p-3 rounded-[12px] bg-black/5 dark:bg-black/40 border border-[var(--line)] overflow-x-auto text-[11px] max-h-72">${JSON.stringify(log.details || log, null, 2)}</pre>
+              </div>
+            </div>
+          `
+        });
+        modal.open();
+      });
+    });
 
     const checkoutForm = this.container.querySelector('#checkout-settings-form');
     if (checkoutForm) {

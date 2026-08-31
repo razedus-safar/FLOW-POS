@@ -1,6 +1,6 @@
 /**
  * FlowPOS Secure Touch Authentication & Cashier PIN Pad Login View
- * Fully responsive for Mobile, Tablet, and Desktop POS Terminals with auto-scrolling & touch ergonomics
+ * Fully responsive for Mobile, Tablet, and Desktop POS Terminals with Operator Dropdown & Touch Ergonomics
  */
 
 import { sessionManager } from '../store/session.js';
@@ -31,6 +31,10 @@ export class LoginPage {
 
     this.handleCloudPulled = () => {
       sessionManager.loadUsers();
+      const users = sessionManager.getAllUsers();
+      if (!this.selectedUserId && users.length > 0) {
+        this.selectedUserId = users[0].id;
+      }
       this.render();
       this.attachEvents();
     };
@@ -56,11 +60,18 @@ export class LoginPage {
     window.removeEventListener('flowpos:theme-changed', this.handleThemeChanged);
     window.removeEventListener('flowpos:cloud-pulled', this.handleCloudPulled);
     window.removeEventListener('flowpos:user-updated', this.handleCloudPulled);
+    if (this.handleKeyDown) {
+      window.removeEventListener('keydown', this.handleKeyDown);
+    }
   }
 
   render() {
     const users = sessionManager.getAllUsers();
-    const selectedUser = users.find(u => u.id === this.selectedUserId) || users[0] || { name: 'Admin', role: 'OWNER' };
+    const selectedUser = users.find(u => u.id === this.selectedUserId) || users[0] || { id: 'usr-admin', name: 'Admin', role: 'OWNER' };
+    if (!this.selectedUserId && selectedUser) {
+      this.selectedUserId = selectedUser.id;
+    }
+
     const settings = settingsService.getSettings();
     const store = settings?.store || {};
     const storeName = store.name || 'FlowPOS Store';
@@ -93,24 +104,6 @@ export class LoginPage {
               ${sanitizeHtml(u.role)}
             </span>
           </div>
-        </button>
-      `;
-    }).join('');
-
-    // Mobile Horizontal Operator Carousel Chips
-    const mobileStaffChipsHtml = users.map(u => {
-      const isSelected = u.id === selectedUser.id;
-      return `
-        <button
-          type="button"
-          data-select-user-id="${u.id}"
-          class="flex items-center space-x-2 px-3 py-2 rounded-[14px] glass-card flex-shrink-0 transition-all select-none ${isSelected ? 'ring-2 ring-[var(--accent)] bg-[var(--accent)]/15 border-[var(--accent)]' : ''}"
-        >
-          <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-[#0066CC] to-[#7E22CE] text-white font-black text-[10px] grid place-items-center flex-shrink-0">
-            ${sanitizeHtml(u.name.substring(0, 2).toUpperCase())}
-          </div>
-          <span class="text-xs font-bold text-[var(--text)] whitespace-nowrap">${sanitizeHtml(u.name)}</span>
-          <span class="badge ${u.role === 'OWNER' ? 'badge-platinum' : u.role === 'MANAGER' ? 'badge-blue' : 'badge-emerald'} text-[8px] px-1.5 py-0.5">${u.role}</span>
         </button>
       `;
     }).join('');
@@ -196,11 +189,18 @@ export class LoginPage {
                 </div>
               </div>
 
-              <!-- Mobile/Tablet Horizontal Operator Carousel -->
-              <div class="lg:hidden mt-4 pt-3 border-t border-[var(--line)]/60">
-                <p class="text-[10.5px] font-bold text-[var(--muted)] uppercase tracking-wider mb-2">Select Operator</p>
-                <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
-                  ${mobileStaffChipsHtml}
+              <!-- Mobile/Tablet Operator Dropdown Selector -->
+              <div class="lg:hidden mt-4 pt-3 border-t border-[var(--line)]/60 space-y-1.5">
+                <label class="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider">Select Active Operator</label>
+                <div class="relative flex items-center">
+                  <select id="mobile-operator-select" class="w-full h-11 pl-3.5 pr-10 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] bg-[var(--card-bg)] border border-[var(--line)] shadow-xs appearance-none cursor-pointer">
+                    ${users.map(u => `
+                      <option value="${u.id}" ${u.id === selectedUser.id ? 'selected' : ''}>
+                        ${sanitizeHtml(u.name)} — ${u.role} ${u.role === 'OWNER' ? '★ (Admin/Owner)' : ''}
+                      </option>
+                    `).join('')}
+                  </select>
+                  <span class="absolute right-3.5 pointer-events-none text-xs text-[var(--muted)] font-bold">▼</span>
                 </div>
               </div>
 
@@ -218,7 +218,7 @@ export class LoginPage {
             <!-- Terminal Security Notice -->
             <div class="p-3 rounded-[16px] glass-card flex items-center space-x-2.5 text-xs text-[var(--muted)]">
               <span class="text-[var(--accent)] text-base flex-shrink-0">🔒</span>
-              <p class="text-[10.5px] leading-tight">Enterprise Session &bull; Fast PIN Verification</p>
+              <p class="text-[10.5px] leading-tight">Enterprise Encrypted Session &bull; Fast PIN Verification</p>
             </div>
           </div>
 
@@ -279,7 +279,7 @@ export class LoginPage {
                     type="text"
                     required
                     value=""
-                    placeholder="Enter username or email"
+                    placeholder="Enter username (e.g. admin)"
                     autocomplete="username"
                     class="w-full h-11 px-3.5 rounded-[12px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
                   />
@@ -294,7 +294,7 @@ export class LoginPage {
                       type="${this.showPassword ? 'text' : 'password'}"
                       required
                       value=""
-                      placeholder="Enter password"
+                      placeholder="Enter password (e.g. admin)"
                       autocomplete="current-password"
                       class="w-full h-11 pl-3.5 pr-11 rounded-[12px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
                     />
@@ -334,7 +334,18 @@ export class LoginPage {
       });
     });
 
-    // Staff selector buttons (Desktop + Mobile Carousel)
+    // Mobile Operator Dropdown Select
+    const mobileSelect = this.container.querySelector('#mobile-operator-select');
+    if (mobileSelect) {
+      mobileSelect.addEventListener('change', (e) => {
+        this.selectedUserId = e.target.value;
+        this.pinBuffer = '';
+        this.render();
+        this.attachEvents();
+      });
+    }
+
+    // Staff selector buttons (Desktop)
     this.container.querySelectorAll('[data-select-user-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.selectedUserId = btn.getAttribute('data-select-user-id');

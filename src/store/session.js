@@ -182,27 +182,52 @@ class SessionManager {
   }
 
   loginWithEmail(emailOrUsername, password) {
-    const clean = String(emailOrUsername).trim().toLowerCase();
-    const user = this.users.find(u => u.email.toLowerCase() === clean || u.name.toLowerCase() === clean);
+    const clean = String(emailOrUsername || '').trim().toLowerCase();
+    const cleanPass = String(password || '').trim();
+    const user = this.users.find(u => (u.email && u.email.toLowerCase() === clean) || (u.name && u.name.toLowerCase() === clean) || (u.id && u.id.toLowerCase() === clean));
     if (!user) {
       return { success: false, message: 'Invalid staff username or email address.' };
     }
-    if (user.password && user.password !== password) {
+    if (user.password && String(user.password).trim() !== cleanPass) {
       return { success: false, message: 'Incorrect password.' };
     }
     return this.setAuthenticatedUser(user);
   }
 
-  loginWithPin(pin, targetUserId = null) {
-    const cleanPin = String(pin).trim();
+  loginWithPassword(emailOrUsername, password) {
+    return this.loginWithEmail(emailOrUsername, password);
+  }
+
+  loginWithPin(arg1, arg2 = null) {
+    let pin = '';
+    let targetUserId = null;
+
+    if (arg2 !== null && arg2 !== undefined) {
+      const s1 = String(arg1 || '').trim();
+      const s2 = String(arg2 || '').trim();
+      // Detect which argument is the 4-digit PIN
+      if (/^\d{4,6}$/.test(s1) && !/^\d{4,6}$/.test(s2)) {
+        pin = s1;
+        targetUserId = s2;
+      } else if (/^\d{4,6}$/.test(s2)) {
+        targetUserId = s1;
+        pin = s2;
+      } else {
+        pin = s1;
+        targetUserId = s2;
+      }
+    } else {
+      pin = String(arg1 || '').trim();
+    }
+
     let user = null;
     if (targetUserId) {
-      user = this.users.find(u => u.id === targetUserId);
-      if (!user || String(user.pin) !== cleanPin) {
+      user = this.users.find(u => u.id === targetUserId || u.name.toLowerCase() === String(targetUserId).toLowerCase());
+      if (!user || String(user.pin).trim() !== pin) {
         return { success: false, message: 'Incorrect 4-digit PIN for selected staff member.' };
       }
     } else {
-      user = this.users.find(u => String(u.pin) === cleanPin);
+      user = this.users.find(u => String(u.pin).trim() === pin);
       if (!user) {
         return { success: false, message: 'Invalid 4-digit staff PIN code.' };
       }

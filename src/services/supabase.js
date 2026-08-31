@@ -1,6 +1,7 @@
 /**
  * Supabase Client & High-Performance Multi-Device Cloud Synchronization Engine
- * Concurrently batched syncs, zero-latency background replication, non-blocking UI
+ * Concurrently batched syncs, zero-latency background replication, non-blocking UI,
+ * real-time audit logger, and comprehensive multi-table re-verification suite.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -8,6 +9,7 @@ import { localDB } from '../offline/database.js';
 
 export const DEFAULT_SUPABASE_URL = 'https://syzcbcevxihjvathygvk.supabase.co';
 export const DEFAULT_SUPABASE_KEY = 'sb_publishable_yr_jcbWJVTWcpvQDe8ic_A_LLHshgmB';
+const SYNC_LOGS_KEY = 'flowpos_cloud_sync_logs';
 
 class SupabaseService {
   constructor() {
@@ -89,6 +91,149 @@ class SupabaseService {
     return this.isConfigured();
   }
 
+  /* -------------------------------------------------------------------------- */
+  /* Real-Time Sync Logger & History                                            */
+  /* -------------------------------------------------------------------------- */
+
+  logSyncEvent({ type, table, status, latency = 0, count = 0, message = '', details = null }) {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const logs = this.getSyncLogs();
+      const newEntry = {
+        id: `slog-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        timestamp: new Date().toISOString(),
+        type: type || 'SYNC', // 'PUSH_ALL' | 'PULL_ALL' | 'RECORD_SAVE' | 'RECORD_DELETE' | 'REALTIME' | 'VERIFY'
+        table: table || 'all',
+        status: status || 'SUCCESS', // 'SUCCESS' | 'WARNING' | 'ERROR'
+        latency: Math.round(latency),
+        count: Number(count) || 0,
+        message: message || '',
+        details: details || null
+      };
+
+      logs.unshift(newEntry);
+      // Keep most recent 100 entries
+      const trimmed = logs.slice(0, 100);
+      localStorage.setItem(SYNC_LOGS_KEY, JSON.stringify(trimmed));
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('flowpos:sync-logged', { detail: newEntry }));
+      }
+      return newEntry;
+    } catch (e) {
+      console.warn('Failed to save sync log:', e);
+    }
+  }
+
+  getSyncLogs() {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const data = localStorage.getItem(SYNC_LOGS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  clearSyncLogs() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(SYNC_LOGS_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('flowpos:sync-logged'));
+      }
+    }
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* Comprehensive Table Re-Verification Suite (Admin View)                     */
+  /* -------------------------------------------------------------------------- */
+
+  async verifyAllCloudTables() {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Supabase credentials not configured' };
+    }
+
+    const startTotal = performance.now();
+    const tablesToTest = [
+      { name: 'products', label: 'Product Catalog', primaryKey: 'id' },
+      { name: 'categories', label: 'Product Categories', primaryKey: 'id' },
+      { name: 'users', label: 'Staff Accounts & Passwords', primaryKey: 'id' },
+      { name: 'customers', label: 'Customer Profiles & Loyalty', primaryKey: 'id' },
+      { name: 'suppliers', label: 'Suppliers & Vendors', primaryKey: 'id' },
+      { name: 'orders', label: 'Sales Orders & Invoices', primaryKey: 'id' },
+      { name: 'settings', label: 'Global Store Settings', primaryKey: 'key' },
+      { name: 'promotions', label: 'Discounts & Promotions', primaryKey: 'id' },
+      { name: 'gift_cards', label: 'Gift Cards & Vouchers', primaryKey: 'id' },
+      { name: 'outlets', label: 'Store Locations & Warehouses', primaryKey: 'id' },
+      { name: 'time_punches', label: 'Staff Time Clock Punches', primaryKey: 'id' },
+      { name: 'register_sessions', label: 'Register Drawer Shifts', primaryKey: 'id' }
+    ];
+
+    const results = await Promise.all(tablesToTest.map(async (tbl) => {
+      const start = performance.now();
+      try {
+        const { data, count, error } = await this.client
+          .from(tbl.name)
+          .select(tbl.primaryKey, { count: 'exact' })
+          .limit(1);
+
+        const latency = Math.round(performance.now() - start);
+
+        if (error) {
+          return {
+            name: tbl.name,
+            label: tbl.label,
+            status: 'ERROR',
+            rows: 0,
+            latency,
+            error: error.message
+          };
+        }
+
+        return {
+          name: tbl.name,
+          label: tbl.label,
+          status: 'HEALTHY',
+          rows: count ?? (data ? data.length : 0),
+          latency,
+          error: null
+        };
+      } catch (err) {
+        return {
+          name: tbl.name,
+          label: tbl.label,
+          status: 'ERROR',
+          rows: 0,
+          latency: Math.round(performance.now() - start),
+          error: err.message
+        };
+      }
+    }));
+
+    const totalLatency = Math.round(performance.now() - startTotal);
+    const healthyCount = results.filter(r => r.status === 'HEALTHY').length;
+    const isSuccess = healthyCount === tablesToTest.length;
+
+    this.logSyncEvent({
+      type: 'VERIFY_ALL_TABLES',
+      table: 'all',
+      status: isSuccess ? 'SUCCESS' : 'WARNING',
+      latency: totalLatency,
+      count: healthyCount,
+      message: `Verified ${healthyCount}/${tablesToTest.length} cloud tables in ${totalLatency}ms`,
+      details: results
+    });
+
+    return {
+      success: isSuccess,
+      totalTables: tablesToTest.length,
+      healthyCount,
+      totalLatency,
+      tables: results,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   async testConnection() {
     if (!this.isConfigured()) return { success: false, message: 'Cloud database credentials are not configured.' };
     try {
@@ -96,8 +241,10 @@ class SupabaseService {
       const { error } = await this.client.from('products').select('id', { count: 'exact', head: true });
       const latency = Math.round(performance.now() - start);
       if (error) {
+        this.logSyncEvent({ type: 'CONNECTION_TEST', status: 'ERROR', latency, message: error.message });
         return { success: false, message: error.message };
       }
+      this.logSyncEvent({ type: 'CONNECTION_TEST', status: 'SUCCESS', latency, message: 'Ping OK' });
       return { success: true, latency, message: `Connected successfully (${latency}ms latency).` };
     } catch (err) {
       return { success: false, message: err.message || 'Connection timeout' };
@@ -111,6 +258,7 @@ class SupabaseService {
   async syncAllToCloud() {
     if (!this.isConfigured()) throw new Error('Cloud database is not configured');
 
+    const start = performance.now();
     const users = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]') : [];
     const settingsRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('flowpos_app_settings') : null;
     const [categories, products, customers, suppliers, orders] = await Promise.all([
@@ -311,6 +459,16 @@ class SupabaseService {
 
     // Await all parallel tasks concurrently
     await Promise.all(syncTasks);
+    const elapsed = Math.round(performance.now() - start);
+
+    this.logSyncEvent({
+      type: 'PUSH_ALL',
+      table: 'all',
+      status: 'SUCCESS',
+      latency: elapsed,
+      count: products.length + users.length + orders.length,
+      message: `Pushed ${products.length} products, ${users.length} users, ${orders.length} orders to Supabase`
+    });
 
     return {
       users: users.length,
@@ -318,7 +476,8 @@ class SupabaseService {
       categories: categories.length,
       customers: customers.length,
       suppliers: suppliers.length,
-      orders: orders.length
+      orders: orders.length,
+      elapsed
     };
   }
 
@@ -329,6 +488,7 @@ class SupabaseService {
   async pullFromCloud() {
     if (!this.isConfigured()) return { success: false, message: 'Not configured' };
 
+    const start = performance.now();
     try {
       const [
         { data: cloudUsers },
@@ -383,6 +543,16 @@ class SupabaseService {
       }
 
       await Promise.all(dbTasks);
+      const elapsed = Math.round(performance.now() - start);
+
+      this.logSyncEvent({
+        type: 'PULL_ALL',
+        table: 'all',
+        status: 'SUCCESS',
+        latency: elapsed,
+        count: (cloudProds?.length || 0) + (cloudUsers?.length || 0),
+        message: `Pulled ${cloudProds?.length || 0} products, ${cloudUsers?.length || 0} staff accounts from Supabase`
+      });
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('flowpos:cloud-pulled'));
@@ -394,10 +564,17 @@ class SupabaseService {
         success: true,
         users: cloudUsers?.length || 0,
         products: cloudProds?.length || 0,
-        categories: cloudCats?.length || 0
+        categories: cloudCats?.length || 0,
+        elapsed
       };
     } catch (err) {
       console.warn('Cloud pull warning:', err);
+      this.logSyncEvent({
+        type: 'PULL_ALL',
+        table: 'all',
+        status: 'ERROR',
+        message: err.message
+      });
       return { success: false, message: err.message };
     }
   }
@@ -413,6 +590,13 @@ class SupabaseService {
       this.realtimeChannel = this.client
         .channel('flowpos-live-mesh')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, async (payload) => {
+          this.logSyncEvent({
+            type: 'REALTIME',
+            table: 'settings',
+            status: 'SUCCESS',
+            message: `Realtime update on settings: ${payload.eventType}`,
+            details: payload
+          });
           if (payload.new && payload.new.value) {
             localStorage.setItem('flowpos_app_settings', JSON.stringify(payload.new.value));
             if (typeof window !== 'undefined') {
@@ -422,6 +606,13 @@ class SupabaseService {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async (payload) => {
+          this.logSyncEvent({
+            type: 'REALTIME',
+            table: 'users',
+            status: 'SUCCESS',
+            message: `Realtime user sync: ${payload.eventType}`,
+            details: payload
+          });
           if (payload.eventType === 'DELETE' && payload.old) {
             let users = JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]');
             users = users.filter(u => u.id !== payload.old.id);
@@ -439,6 +630,13 @@ class SupabaseService {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
+          this.logSyncEvent({
+            type: 'REALTIME',
+            table: 'products',
+            status: 'SUCCESS',
+            message: `Realtime product sync: ${payload.eventType}`,
+            details: payload
+          });
           if (payload.eventType === 'DELETE') {
             await localDB.delete('products', payload.old.id);
           } else if (payload.new) {
@@ -447,6 +645,13 @@ class SupabaseService {
           if (onUpdateCallback) onUpdateCallback('products', payload);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+          this.logSyncEvent({
+            type: 'REALTIME',
+            table: 'orders',
+            status: 'SUCCESS',
+            message: `Realtime order sync: ${payload.eventType}`,
+            details: payload
+          });
           if (payload.new) {
             await localDB.put('orders', payload.new);
           }
