@@ -6,8 +6,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { localDB } from '../offline/database.js';
 
-const DEFAULT_SUPABASE_URL = 'https://syzcbcevxihjvathygvk.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'sb_publishable_yr_jcbWJVTWcpvQDe8ic_A_LLHshgmB';
+export const DEFAULT_SUPABASE_URL = 'https://syzcbcevxihjvathygvk.supabase.co';
+export const DEFAULT_SUPABASE_KEY = 'sb_publishable_yr_jcbWJVTWcpvQDe8ic_A_LLHshgmB';
 
 class SupabaseService {
   constructor() {
@@ -22,6 +22,15 @@ class SupabaseService {
         const data = localStorage.getItem('flowpos_supabase_config');
         if (data) savedConfig = JSON.parse(data);
       } catch {}
+
+      // Auto-heal any stale, empty or placeholder key stored in browser localStorage
+      if (savedConfig) {
+        if (!savedConfig.key || savedConfig.key.includes('your-') || savedConfig.key.length < 20 || savedConfig.key !== DEFAULT_SUPABASE_KEY) {
+          savedConfig.url = DEFAULT_SUPABASE_URL;
+          savedConfig.key = DEFAULT_SUPABASE_KEY;
+          localStorage.setItem('flowpos_supabase_config', JSON.stringify(savedConfig));
+        }
+      }
     }
 
     const envUrl = (typeof import.meta !== 'undefined' && import.meta.env)
@@ -65,7 +74,17 @@ class SupabaseService {
     const finalUrl = (url || DEFAULT_SUPABASE_URL).trim();
     const finalKey = (key || DEFAULT_SUPABASE_KEY).trim();
     const config = { url: finalUrl, key: finalKey };
-    localStorage.setItem('flowpos_supabase_config', JSON.stringify(config));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('flowpos_supabase_config', JSON.stringify(config));
+    }
+    this.init();
+    return this.isConfigured();
+  }
+
+  resetToDefault() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('flowpos_supabase_config');
+    }
     this.init();
     return this.isConfigured();
   }

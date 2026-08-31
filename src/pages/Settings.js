@@ -719,7 +719,10 @@ export class SettingsPage {
               <button type="button" id="test-cloud-btn" class="px-4 py-2.5 rounded-[12px] text-xs font-bold glass-btn-secondary active:scale-96 transition">
                 Test Connection
               </button>
-              <button type="button" id="sync-now-cloud-btn" class="px-4 py-2.5 rounded-[12px] text-xs font-bold glass-btn-secondary text-[var(--accent)] hover:bg-[var(--accent)]/10 active:scale-96 transition">
+              <button type="button" id="reset-cloud-btn" class="px-4 py-2.5 rounded-[12px] text-xs font-bold glass-btn-secondary text-[var(--accent)] active:scale-96 transition" title="Restore default verified cloud credentials">
+                Reset to Default Keys
+              </button>
+              <button type="button" id="sync-now-cloud-btn" class="px-4 py-2.5 rounded-[12px] text-xs font-bold glass-btn-secondary text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 active:scale-96 transition">
                 Sync Local Store to Cloud Now
               </button>
             </div>
@@ -1371,6 +1374,16 @@ export class SettingsPage {
             toast.error(res.message);
           }
         }
+      });
+    }
+
+    const resetCloudBtn = this.container.querySelector('#reset-cloud-btn');
+    if (resetCloudBtn) {
+      resetCloudBtn.addEventListener('click', () => {
+        supabaseClient.resetToDefault();
+        toast.success('Restored default verified Supabase credentials!');
+        this.render();
+        this.attachEvents();
       });
     }
 
