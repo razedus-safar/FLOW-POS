@@ -136,13 +136,13 @@ class SessionManager {
     return list;
   }
 
-  saveUsers(users) {
+  async saveUsers(users) {
     this.users = users;
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('flowpos_staff_users', JSON.stringify(users));
         if (typeof localDB !== 'undefined' && localDB.putMany) {
-          localDB.putMany('users', users).catch(() => {});
+          localDB.clear('users').then(() => localDB.putMany('users', users)).catch(() => {});
         }
       } catch (e) {
         console.warn('Storage save warning:', e);
@@ -151,21 +151,33 @@ class SessionManager {
 
     // Auto-sync staff credentials & passwords to Supabase
     if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
-      const payload = users.map(u => ({
-        id: String(u.id),
-        name: u.name || 'admin',
-        role: u.role || 'CASHIER',
-        email: u.email || `${u.name}@flowpos.store`,
-        pin: String(u.pin || '1234'),
-        password: String(u.password || 'admin'),
-        avatar: u.avatar || '',
-        title: u.title || '',
-        is_active: u.is_active !== false,
-        updated_at: new Date().toISOString()
-      }));
-      supabaseClient.client.from('users').upsert(payload, { onConflict: 'id' }).then(({ error }) => {
-        if (error) console.warn('Online user sync error:', error.message);
-      }).catch(err => console.warn('Online user sync failed:', err));
+      try {
+        const payload = users.map(u => ({
+          id: String(u.id),
+          name: u.name || 'admin',
+          role: u.role || 'CASHIER',
+          email: u.email || `${u.name}@flowpos.store`,
+          pin: String(u.pin || '1234'),
+          password: String(u.password || 'admin'),
+          avatar: u.avatar || '',
+          title: u.title || '',
+          is_active: u.is_active !== false,
+          updated_at: new Date().toISOString()
+        }));
+        await supabaseClient.client.from('users').upsert(payload, { onConflict: 'id' });
+
+        // Prune deleted users from cloud in same transaction
+        const activeIds = users.map(u => String(u.id));
+        const { data: cloudUsers } = await supabaseClient.client.from('users').select('id');
+        if (cloudUsers && Array.isArray(cloudUsers)) {
+          const toDelete = cloudUsers.filter(cu => !activeIds.includes(cu.id)).map(cu => cu.id);
+          if (toDelete.length > 0) {
+            await supabaseClient.client.from('users').delete().in('id', toDelete);
+          }
+        }
+      } catch (err) {
+        console.warn('Online user sync error:', err);
+      }
     }
   }
 
@@ -383,7 +395,7 @@ class SessionManager {
     };
   }
 
-  deleteUser(id) {
+  async deleteUser(id) {
     const target = this.users.find(u => u.id === id);
     if (target && target.role === ROLES.OWNER) {
       throw new Error('The Store Owner account cannot be deleted. Transfer ownership first if required.');
@@ -393,20 +405,31 @@ class SessionManager {
       throw new Error('Cannot delete the only staff user.');
     }
     this.users = this.users.filter(u => u.id !== id);
-    this.saveUsers(this.users);
+    await this.saveUsers(this.users);
 
     if (typeof localDB !== 'undefined' && localDB.delete) {
-      localDB.delete('users', id).catch(() => {});
+      await localDB.delete('users', id).catch(() => {});
     }
 
     if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
-      supabaseClient.client.from('users').delete().eq('id', id).then(({ error }) => {
-        if (error) console.warn('Supabase delete user error:', error.message);
-      }).catch(err => console.warn('Supabase delete user failed:', err));
+      try {
+        const { error } = await supabaseClient.client.from('users').delete().eq('id', String(id));
+        if (error) {
+          console.warn('Supabase delete user error:', error.message);
+        } else {
+          supabaseClient.logSyncEvent('RECORD_DELETE', `Deleted user ${target?.name || id} from cloud`, { table: 'users', id });
+        }
+      } catch (err) {
+        console.warn('Supabase delete user failed:', err);
+      }
     }
 
     if (this.currentUser && this.currentUser.id === id) {
       this.setAuthenticatedUser(this.users[0]);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('flowpos:user-updated'));
     }
   }
 

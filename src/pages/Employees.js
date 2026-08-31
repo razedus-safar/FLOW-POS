@@ -241,11 +241,11 @@ export class EmployeesPage {
           message: `Are you sure you want to remove ${user ? user.name : 'this user'}? This cannot be undone.`,
           confirmText: 'Delete User',
           isDanger: true,
-          onConfirm: () => {
+          onConfirm: async () => {
             try {
-              sessionManager.deleteUser(id);
-              toast.success('Staff user deleted.');
-              this.init();
+              await sessionManager.deleteUser(id);
+              toast.success('Staff user deleted from local database and Supabase cloud.');
+              await this.init();
             } catch (err) {
               toast.error(err.message);
             }
