@@ -20,8 +20,12 @@ class SupabaseService {
       } catch {}
     }
 
-    const envUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_URL : '';
-    const envKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY : '';
+    const envUrl = (typeof import.meta !== 'undefined' && import.meta.env)
+      ? (import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || '')
+      : '';
+    const envKey = (typeof import.meta !== 'undefined' && import.meta.env)
+      ? (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '')
+      : '';
 
     const url = (savedConfig?.url || envUrl || '').trim();
     const key = (savedConfig?.key || envKey || '').trim();
