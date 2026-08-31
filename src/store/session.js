@@ -92,8 +92,7 @@ class SessionManager {
 
   loadUsers() {
     const hasStorage = typeof localStorage !== 'undefined';
-    const isWiped = hasStorage && localStorage.getItem('flowpos_db_seeded') === 'wiped';
-    let list = isWiped ? [DEFAULT_USERS[0]] : [...DEFAULT_USERS];
+    let list = [];
 
     if (hasStorage) {
       try {
@@ -105,6 +104,15 @@ class SessionManager {
           }
         }
       } catch {}
+    }
+
+    // Seed defaults only on very first clean installation
+    if (list.length === 0) {
+      const isWiped = hasStorage && localStorage.getItem('flowpos_db_seeded') === 'wiped';
+      list = isWiped ? [DEFAULT_USERS[0]] : [...DEFAULT_USERS];
+      if (hasStorage) {
+        localStorage.setItem('flowpos_staff_users', JSON.stringify(list));
+      }
     }
 
     // Auto-migrate legacy 'safar' user to 'admin'
@@ -132,7 +140,6 @@ class SessionManager {
       list.unshift(DEFAULT_USERS[0]);
     }
 
-    this.saveUsers(list);
     return list;
   }
 
