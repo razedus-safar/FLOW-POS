@@ -331,8 +331,11 @@ export class POSPage {
       });
     }
 
-    // Subscribe to cart store to update floating cart bar
-    globalStore.subscribe('cart', () => {
+    // Subscribe to cart store once to update floating cart bar
+    if (this.unsubCart) {
+      this.unsubCart();
+    }
+    this.unsubCart = globalStore.subscribe('cart', () => {
       const updatedCart = globalStore.get('cart', { totals: { itemCount: 0, total: 0 } });
       const floatingCount = this.container.querySelector('#floating-cart-count');
       const floatingTotal = this.container.querySelector('#floating-cart-total');
@@ -357,31 +360,41 @@ export class POSPage {
       return;
     }
 
+    const fragment = document.createDocumentFragment();
     productsList.forEach(prod => {
       const card = createProductCard(prod, (p) => {
         cartStore.addItem(p, 1);
         soundManager.playBeep();
         toast.success(`Added ${p.name}`);
       });
-      grid.appendChild(card);
+      fragment.appendChild(card);
     });
+    grid.appendChild(fragment);
   }
 
   attachEvents() {
     const searchInput = this.container.querySelector('#pos-product-search');
     if (searchInput) {
+      let searchTimeout = null;
       searchInput.addEventListener('input', (e) => {
         this.searchQuery = e.target.value;
-        const filtered = this.getFilteredProducts();
-        this.renderProductsInGrid(filtered);
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          const filtered = this.getFilteredProducts();
+          this.renderProductsInGrid(filtered);
+        }, 60);
       });
     }
 
     this.container.querySelectorAll('[data-category-filter]').forEach(pill => {
       pill.addEventListener('click', () => {
         this.selectedCategory = pill.getAttribute('data-category-filter');
-        this.render();
-        this.attachEvents();
+        // Fast DOM toggle without page re-render
+        this.container.querySelectorAll('[data-category-filter]').forEach(p => {
+          p.classList.toggle('active', p.getAttribute('data-category-filter') === this.selectedCategory);
+        });
+        const filtered = this.getFilteredProducts();
+        this.renderProductsInGrid(filtered);
       });
     });
 

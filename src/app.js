@@ -81,24 +81,25 @@ export class App {
       this.render();
     });
 
-    // Auto-sync & Pull latest store data & staff credentials from Supabase
+    // Auto-sync & Pull latest store data & staff credentials from Supabase in background
     if (supabaseClient.isConfigured()) {
       supabaseClient.pullFromCloud().then(res => {
-        if (res.success && (res.users > 0 || res.products > 0)) {
+        if (res.success && res.users > 0) {
           sessionManager.loadUsers();
-          if (this.currentPageInstance && typeof this.currentPageInstance.render === 'function') {
-            this.currentPageInstance.render();
-          }
         }
       });
 
+      let realtimeTimeout = null;
       supabaseClient.subscribeRealtime((table) => {
         if (table === 'users') {
           sessionManager.loadUsers();
         }
-        if (this.currentPageInstance && typeof this.currentPageInstance.render === 'function') {
-          this.currentPageInstance.render();
-        }
+        if (realtimeTimeout) clearTimeout(realtimeTimeout);
+        realtimeTimeout = setTimeout(() => {
+          if (this.currentPageInstance && typeof this.currentPageInstance.init === 'function') {
+            this.currentPageInstance.init();
+          }
+        }, 150);
       });
     }
 
