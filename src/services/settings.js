@@ -7,6 +7,11 @@ import { localDB } from '../offline/database.js';
 import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './products.js';
 import { INITIAL_CUSTOMERS } from './customers.js';
 import { INITIAL_SUPPLIERS } from './suppliers.js';
+import { INITIAL_PUNCHES } from './timeClock.js';
+import { INITIAL_GIFT_CARDS } from './giftCards.js';
+import { DEFAULT_PROMOTIONS } from './promotions.js';
+import { INITIAL_OUTLETS, CLEAN_OUTLETS } from './outlets.js';
+import { DEFAULT_USERS } from '../store/session.js';
 import { SUPPORTED_CURRENCIES } from '../utils/currency.js';
 import { cartStore } from '../store/cart.js';
 
@@ -289,6 +294,12 @@ class SettingsService {
     await localDB.clear('register_sessions');
     await localDB.clear('sync_queue');
     await localDB.clear('users');
+    await localDB.clear('purchase_orders');
+    await localDB.clear('gift_cards');
+    await localDB.clear('promotions');
+    await localDB.clear('outlets');
+    await localDB.clear('time_punches');
+    await localDB.clear('audit_logs');
 
     // Create a starter clean General category
     await localDB.put('categories', {
@@ -323,23 +334,20 @@ class SettingsService {
     localStorage.setItem('flowpos_active_user_id', 'usr-admin');
     localStorage.setItem('flowpos_authenticated', 'true');
 
-    // Clear all module storage keys
-    const keysToClean = [
-      'flowpos_time_punches',
-      'flowpos_gift_cards',
-      'flowpos_promotions',
-      'flowpos_outlets',
-      'flowpos_active_outlet_id',
-      'flowpos_active_register_session',
-      'flowpos_suspended_carts',
-      'flowpos_purchase_orders',
-      'flowpos_cart',
-      'flowpos_held_orders',
-      'flowpos_role_permissions_map',
-      'flowpos_audit_logs',
-      'flowpos_last_sync_time'
-    ];
-    keysToClean.forEach(k => localStorage.removeItem(k));
+    // Clear and set explicit empty state for all feature modules
+    localStorage.setItem('flowpos_time_punches', JSON.stringify([]));
+    localStorage.setItem('flowpos_gift_cards', JSON.stringify([]));
+    localStorage.setItem('flowpos_promotions', JSON.stringify([]));
+    localStorage.setItem('flowpos_purchase_orders', JSON.stringify([]));
+    localStorage.setItem('flowpos_suspended_carts', JSON.stringify([]));
+    localStorage.setItem('flowpos_held_orders', JSON.stringify([]));
+    localStorage.setItem('flowpos_cart', JSON.stringify({ items: [] }));
+    localStorage.setItem('flowpos_audit_logs', JSON.stringify([]));
+    localStorage.setItem('flowpos_outlets', JSON.stringify(CLEAN_OUTLETS));
+    localStorage.setItem('flowpos_active_outlet_id', 'out-main');
+
+    localStorage.removeItem('flowpos_active_register_session');
+    localStorage.removeItem('flowpos_last_sync_time');
 
     if (cartStore) {
       cartStore.clearCart();
@@ -359,31 +367,37 @@ class SettingsService {
     await localDB.clear('register_sessions');
     await localDB.clear('sync_queue');
     await localDB.clear('users');
+    await localDB.clear('purchase_orders');
+    await localDB.clear('gift_cards');
+    await localDB.clear('promotions');
+    await localDB.clear('outlets');
+    await localDB.clear('time_punches');
+    await localDB.clear('audit_logs');
 
     await localDB.putMany('categories', INITIAL_CATEGORIES);
     await localDB.putMany('products', INITIAL_PRODUCTS);
     await localDB.putMany('customers', INITIAL_CUSTOMERS);
     await localDB.putMany('suppliers', INITIAL_SUPPLIERS);
+    await localDB.putMany('users', DEFAULT_USERS);
 
-    // Clear all module storage keys
-    const keysToClean = [
-      'flowpos_time_punches',
-      'flowpos_gift_cards',
-      'flowpos_promotions',
-      'flowpos_outlets',
-      'flowpos_active_outlet_id',
-      'flowpos_active_register_session',
-      'flowpos_suspended_carts',
-      'flowpos_purchase_orders',
-      'flowpos_cart',
-      'flowpos_held_orders',
-      'flowpos_role_permissions_map',
-      'flowpos_audit_logs',
-      'flowpos_last_sync_time'
-    ];
-    keysToClean.forEach(k => localStorage.removeItem(k));
-
+    // Set demo sample data across all modules
     localStorage.setItem('flowpos_db_seeded', 'true');
+    localStorage.setItem('flowpos_staff_users', JSON.stringify(DEFAULT_USERS));
+    localStorage.setItem('flowpos_active_user_id', 'usr-admin');
+    localStorage.setItem('flowpos_authenticated', 'true');
+    localStorage.setItem('flowpos_time_punches', JSON.stringify(INITIAL_PUNCHES));
+    localStorage.setItem('flowpos_gift_cards', JSON.stringify(INITIAL_GIFT_CARDS));
+    localStorage.setItem('flowpos_promotions', JSON.stringify(DEFAULT_PROMOTIONS));
+    localStorage.setItem('flowpos_outlets', JSON.stringify(INITIAL_OUTLETS));
+    localStorage.setItem('flowpos_active_outlet_id', 'out-01');
+    localStorage.setItem('flowpos_purchase_orders', JSON.stringify([]));
+    localStorage.setItem('flowpos_suspended_carts', JSON.stringify([]));
+    localStorage.setItem('flowpos_held_orders', JSON.stringify([]));
+    localStorage.setItem('flowpos_cart', JSON.stringify({ items: [] }));
+    localStorage.setItem('flowpos_audit_logs', JSON.stringify([]));
+
+    localStorage.removeItem('flowpos_active_register_session');
+    localStorage.removeItem('flowpos_last_sync_time');
 
     if (cartStore) {
       cartStore.clearCart();

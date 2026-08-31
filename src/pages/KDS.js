@@ -50,6 +50,7 @@ export class KDSPage {
 
   async loadOrders() {
     const all = await ordersService.getAllOrders();
+    const isWiped = typeof localStorage !== 'undefined' && localStorage.getItem('flowpos_db_seeded') === 'wiped';
     // Use recent orders as active prep items if any exist
     if (all && all.length > 0) {
       this.activeOrders = all.slice(0, 8).map((o, idx) => ({
@@ -57,8 +58,8 @@ export class KDSPage {
         kdsStatus: 'IN_PREP',
         createdAtTimestamp: Date.now() - (idx * 120000) // simulated staggered minutes
       }));
-    } else {
-      // Create starter demo ticket for instant preview
+    } else if (!isWiped) {
+      // Create starter demo ticket for instant preview only when in demo mode
       this.activeOrders = [
         {
           id: 'ord-demo-1',
@@ -82,6 +83,8 @@ export class KDSPage {
           ]
         }
       ];
+    } else {
+      this.activeOrders = [];
     }
   }
 

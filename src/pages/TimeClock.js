@@ -180,7 +180,13 @@ export class TimeClockPage {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[var(--line)] text-xs">
-                  ${timesheetRowsHtml}
+                  ${this.punches.length === 0 ? `
+                    <tr>
+                      <td colspan="5" class="p-8 text-center text-xs text-[var(--muted)]">
+                        No shift timesheets recorded yet. Staff punch ins and outs will appear here.
+                      </td>
+                    </tr>
+                  ` : timesheetRowsHtml}
                 </tbody>
               </table>
             </div>

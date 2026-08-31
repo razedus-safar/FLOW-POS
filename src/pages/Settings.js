@@ -950,27 +950,6 @@ export class SettingsPage {
               </button>
             </div>
 
-            <!-- 5. Complete Factory Reset -->
-            <div class="glass-card p-4.5 rounded-[22px] border border-red-500/40 bg-red-950/10 space-y-3 flex flex-col justify-between shadow-xs sm:col-span-2">
-              <div class="space-y-2">
-                <div class="flex items-center space-x-2.5">
-                  <div class="p-2.5 rounded-[12px] bg-red-600/20 text-red-500">
-                    ${renderIcon('alert-triangle', 'w-5 h-5')}
-                  </div>
-                  <div>
-                    <h4 class="text-xs font-black text-red-500">Full System Factory Reset & Data Wipe</h4>
-                    <p class="text-[10px] text-[var(--muted)] font-medium">Completely reset all storage, shifts, gift cards, registers, and settings back to original clean state</p>
-                  </div>
-                </div>
-                <p class="text-[11px] text-[var(--muted)] leading-relaxed">
-                  Wipes all local IndexedDB tables, clears shift history timesheets, gift cards, promotions, outlet locations, and resets settings.
-                </p>
-              </div>
-              <button id="factory-reset-btn" class="w-full py-2.5 rounded-[12px] text-xs font-black bg-red-700 hover:bg-red-800 text-white shadow-md active:scale-96 transition flex items-center justify-center space-x-2">
-                ${renderIcon('alert-triangle', 'w-3.5 h-3.5')}
-                <span>Perform Complete Factory Reset</span>
-              </button>
-            </div>
           </div>
         </div>
       `;
@@ -1568,23 +1547,6 @@ export class SettingsPage {
           onConfirm: async () => {
             toast.info('Loading demo catalog…');
             await settingsService.resetToSeedData();
-          }
-        });
-      });
-    }
-
-    // 5. Complete Factory Reset
-    const factoryResetBtn = this.container.querySelector('#factory-reset-btn');
-    if (factoryResetBtn) {
-      factoryResetBtn.addEventListener('click', () => {
-        showConfirmDialog({
-          title: '⚠️ Perform Full Factory Reset?',
-          message: 'DANGER: This will permanently delete ALL data, orders, shifts, categories, products, customer records, and settings. The system will return to brand new state. Are you absolutely sure?',
-          confirmText: 'Yes, Factory Reset Everything',
-          isDanger: true,
-          onConfirm: async () => {
-            toast.warning('Resetting entire system to factory default…');
-            await settingsService.factoryReset();
           }
         });
       });

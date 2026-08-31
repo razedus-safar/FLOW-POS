@@ -39,18 +39,39 @@ export const INITIAL_OUTLETS = [
   }
 ];
 
+export const CLEAN_OUTLETS = [
+  {
+    id: 'out-main',
+    name: 'Main Store',
+    code: 'MAIN-01',
+    address: 'Main Store Terminal',
+    city: '',
+    phone: '',
+    is_warehouse: false,
+    is_active: true
+  }
+];
+
 class OutletsService {
   constructor() {
+    const isWiped = typeof localStorage !== 'undefined' && localStorage.getItem('flowpos_db_seeded') === 'wiped';
     this.outlets = this.load();
-    this.activeOutletId = typeof localStorage !== 'undefined' ? (localStorage.getItem(ACTIVE_OUTLET_KEY) || 'out-01') : 'out-01';
+    this.activeOutletId = typeof localStorage !== 'undefined'
+      ? (localStorage.getItem(ACTIVE_OUTLET_KEY) || (isWiped ? 'out-main' : 'out-01'))
+      : (isWiped ? 'out-main' : 'out-01');
   }
 
   load() {
     if (typeof localStorage !== 'undefined') {
+      const isWiped = localStorage.getItem('flowpos_db_seeded') === 'wiped';
       try {
         const data = localStorage.getItem(STORAGE_KEY);
-        if (data) return JSON.parse(data);
+        if (data !== null) return JSON.parse(data);
       } catch {}
+      if (isWiped) {
+        this.save(CLEAN_OUTLETS);
+        return CLEAN_OUTLETS;
+      }
       this.save(INITIAL_OUTLETS);
     }
     return INITIAL_OUTLETS;

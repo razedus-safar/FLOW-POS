@@ -139,7 +139,13 @@ export class PromotionsPage {
         <!-- Promo Cards Grid -->
         <div class="flex-1 overflow-y-auto">
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
-            ${promoCardsHtml}
+            ${this.promotions.length === 0 ? `
+              <div class="col-span-full py-16 flex flex-col items-center justify-center text-center space-y-3 glass-card rounded-[22px] border border-[var(--line)] p-6">
+                <span class="text-4xl">🏷️</span>
+                <h3 class="text-sm font-black text-[var(--text)]">No promotional rules configured</h3>
+                <p class="text-xs text-[var(--muted)] max-w-sm">Create automated discount campaigns, volume discounts, or Happy Hour flash deals using the button above.</p>
+              </div>
+            ` : promoCardsHtml}
           </div>
         </div>
 

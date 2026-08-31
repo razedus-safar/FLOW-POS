@@ -44,13 +44,15 @@ class GiftCardsService {
 
   load() {
     if (typeof localStorage !== 'undefined') {
+      const isWiped = localStorage.getItem('flowpos_db_seeded') === 'wiped';
       try {
         const data = localStorage.getItem(STORAGE_KEY);
-        if (data) return JSON.parse(data);
+        if (data !== null) return JSON.parse(data);
       } catch {}
+      if (isWiped) return [];
       this.save(INITIAL_GIFT_CARDS);
     }
-    return INITIAL_GIFT_CARDS;
+    return [];
   }
 
   save(cards) {
