@@ -1,6 +1,6 @@
 /**
- * Supabase Client & Multi-Store Cloud Synchronization Layer
- * Seamlessly connects to Supabase PostgreSQL or falls back to IndexedDB local offline storage.
+ * Supabase Client & Multi-Device Cloud Synchronization Engine
+ * Full cloud backup, pull on startup, live websocket sync, staff passwords & permissions
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -8,6 +8,7 @@ import { localDB } from '../offline/database.js';
 
 class SupabaseService {
   constructor() {
+    this.realtimeChannel = null;
     this.init();
   }
 
@@ -79,16 +80,50 @@ class SupabaseService {
     }
   }
 
+  /**
+   * PUSH / SYNC ALL LOCAL STORE DATA TO CLOUD
+   */
   async syncAllToCloud() {
     if (!this.isConfigured()) throw new Error('Cloud database is not configured');
 
+    const users = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]') : [];
+    const settingsRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('flowpos_app_settings') : null;
     const categories = await localDB.getAll('categories');
     const products = await localDB.getAll('products');
     const customers = await localDB.getAll('customers');
     const suppliers = await localDB.getAll('suppliers');
     const orders = await localDB.getAll('orders');
 
-    // 1. Sync Categories
+    // 1. Sync Staff Users, Passwords & PINs
+    if (users.length > 0) {
+      const payload = users.map(u => ({
+        id: String(u.id),
+        name: u.name || 'admin',
+        role: u.role || 'CASHIER',
+        email: u.email || `${u.name}@flowpos.store`,
+        pin: String(u.pin || '1234'),
+        password: String(u.password || 'admin'),
+        avatar: u.avatar || '',
+        title: u.title || '',
+        is_active: u.is_active !== false,
+        updated_at: new Date().toISOString()
+      }));
+      const { error } = await this.client.from('users').upsert(payload, { onConflict: 'id' });
+      if (error) throw new Error(`Users sync error: ${error.message}`);
+    }
+
+    // 2. Sync Store Settings & Branding
+    if (settingsRaw) {
+      const parsedSettings = JSON.parse(settingsRaw);
+      const { error } = await this.client.from('settings').upsert({
+        key: 'global_settings',
+        value: parsedSettings,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+      if (error) console.warn('Settings sync warning:', error.message);
+    }
+
+    // 3. Sync Categories
     if (categories.length > 0) {
       const payload = categories.map(c => ({
         id: String(c.id),
@@ -103,7 +138,7 @@ class SupabaseService {
       if (error) throw new Error(`Categories sync error: ${error.message}`);
     }
 
-    // 2. Sync Suppliers
+    // 4. Sync Suppliers
     if (suppliers.length > 0) {
       const payload = suppliers.map(s => ({
         id: String(s.id),
@@ -121,7 +156,7 @@ class SupabaseService {
       if (error) throw new Error(`Suppliers sync error: ${error.message}`);
     }
 
-    // 3. Sync Products
+    // 5. Sync Products
     if (products.length > 0) {
       const payload = products.map(p => ({
         id: String(p.id),
@@ -140,13 +175,14 @@ class SupabaseService {
         image_url: p.image_url || '',
         track_inventory: p.track_inventory !== false,
         is_active: p.is_active !== false,
-        created_at: p.created_at || new Date().toISOString()
+        created_at: p.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }));
       const { error } = await this.client.from('products').upsert(payload, { onConflict: 'id' });
       if (error) throw new Error(`Products sync error: ${error.message}`);
     }
 
-    // 4. Sync Customers
+    // 6. Sync Customers
     if (customers.length > 0) {
       const payload = customers.map(c => ({
         id: String(c.id),
@@ -165,7 +201,7 @@ class SupabaseService {
       if (error) throw new Error(`Customers sync error: ${error.message}`);
     }
 
-    // 5. Sync Orders
+    // 7. Sync Orders
     if (orders.length > 0) {
       const payload = orders.map(o => ({
         id: String(o.id),
@@ -186,12 +222,121 @@ class SupabaseService {
     }
 
     return {
+      users: users.length,
       products: products.length,
       categories: categories.length,
       customers: customers.length,
       suppliers: suppliers.length,
       orders: orders.length
     };
+  }
+
+  /**
+   * PULL LATEST STORE DATA FROM CLOUD
+   * Used automatically when another device / computer opens the website
+   */
+  async pullFromCloud() {
+    if (!this.isConfigured()) return { success: false, message: 'Not configured' };
+
+    try {
+      // 1. Pull Staff Users & Passwords
+      const { data: cloudUsers, error: userErr } = await this.client.from('users').select('*');
+      if (!userErr && Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+        localStorage.setItem('flowpos_staff_users', JSON.stringify(cloudUsers));
+        await localDB.putMany('users', cloudUsers);
+      }
+
+      // 2. Pull Store Settings
+      const { data: cloudSettings, error: setErr } = await this.client.from('settings').select('*').eq('key', 'global_settings').single();
+      if (!setErr && cloudSettings?.value) {
+        localStorage.setItem('flowpos_app_settings', JSON.stringify(cloudSettings.value));
+      }
+
+      // 3. Pull Categories
+      const { data: cloudCats, error: catErr } = await this.client.from('categories').select('*');
+      if (!catErr && Array.isArray(cloudCats) && cloudCats.length > 0) {
+        await localDB.putMany('categories', cloudCats);
+      }
+
+      // 4. Pull Products
+      const { data: cloudProds, error: prodErr } = await this.client.from('products').select('*');
+      if (!prodErr && Array.isArray(cloudProds) && cloudProds.length > 0) {
+        await localDB.putMany('products', cloudProds);
+      }
+
+      // 5. Pull Customers
+      const { data: cloudCusts, error: custErr } = await this.client.from('customers').select('*');
+      if (!custErr && Array.isArray(cloudCusts) && cloudCusts.length > 0) {
+        await localDB.putMany('customers', cloudCusts);
+      }
+
+      // 6. Pull Suppliers
+      const { data: cloudSupps, error: suppErr } = await this.client.from('suppliers').select('*');
+      if (!suppErr && Array.isArray(cloudSupps) && cloudSupps.length > 0) {
+        await localDB.putMany('suppliers', cloudSupps);
+      }
+
+      // 7. Pull Orders
+      const { data: cloudOrders, error: ordErr } = await this.client.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
+      if (!ordErr && Array.isArray(cloudOrders) && cloudOrders.length > 0) {
+        await localDB.putMany('orders', cloudOrders);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('flowpos:cloud-pulled'));
+      }
+
+      return {
+        success: true,
+        users: cloudUsers?.length || 0,
+        products: cloudProds?.length || 0,
+        categories: cloudCats?.length || 0
+      };
+    } catch (err) {
+      console.warn('Cloud pull warning:', err);
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * SUBSCRIBE TO REALTIME WEBSOCKET CHANGES ACROSS TERMINALS
+   */
+  subscribeRealtime(onUpdateCallback) {
+    if (!this.isConfigured()) return;
+    if (this.realtimeChannel) return;
+
+    try {
+      this.realtimeChannel = this.client
+        .channel('flowpos-live-mesh')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async (payload) => {
+          if (payload.new) {
+            const users = JSON.parse(localStorage.getItem('flowpos_staff_users') || '[]');
+            const idx = users.findIndex(u => u.id === payload.new.id);
+            if (idx >= 0) users[idx] = payload.new;
+            else users.push(payload.new);
+            localStorage.setItem('flowpos_staff_users', JSON.stringify(users));
+            await localDB.put('users', payload.new);
+            if (onUpdateCallback) onUpdateCallback('users', payload);
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
+          if (payload.eventType === 'DELETE') {
+            await localDB.delete('products', payload.old.id);
+          } else if (payload.new) {
+            await localDB.put('products', payload.new);
+          }
+          if (onUpdateCallback) onUpdateCallback('products', payload);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+          if (payload.new) {
+            await localDB.put('orders', payload.new);
+          }
+          if (onUpdateCallback) onUpdateCallback('orders', payload);
+        })
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription error:', err);
+    }
   }
 }
 

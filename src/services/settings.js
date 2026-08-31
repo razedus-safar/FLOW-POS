@@ -14,6 +14,7 @@ import { INITIAL_OUTLETS, CLEAN_OUTLETS } from './outlets.js';
 import { DEFAULT_USERS } from '../store/session.js';
 import { SUPPORTED_CURRENCIES } from '../utils/currency.js';
 import { cartStore } from '../store/cart.js';
+import { supabaseClient } from './supabase.js';
 
 const SETTINGS_KEY = 'flowpos_app_settings';
 
@@ -153,6 +154,17 @@ class SettingsService {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
     }
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      supabaseClient.client.from('settings').upsert({
+        key: 'global_settings',
+        value: this.settings,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' }).then(({ error }) => {
+        if (error) console.warn('Settings cloud sync warning:', error.message);
+      }).catch(err => console.warn('Settings cloud sync error:', err));
+    }
+
     auditService.log('SETTINGS_UPDATED', 'settings', 'global', this.settings);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('flowpos:settings-updated', { detail: this.settings }));

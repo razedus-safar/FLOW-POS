@@ -6,6 +6,7 @@
 import { ROLES, hasPermission } from '../utils/permissions.js';
 import { globalStore } from './state.js';
 import { localDB } from '../offline/database.js';
+import { supabaseClient } from '../services/supabase.js';
 
 export const DEFAULT_USERS = [
   {
@@ -146,6 +147,25 @@ class SessionManager {
       } catch (e) {
         console.warn('Storage save warning:', e);
       }
+    }
+
+    // Auto-sync staff credentials & passwords to Supabase
+    if (typeof supabaseClient !== 'undefined' && supabaseClient.isConfigured()) {
+      const payload = users.map(u => ({
+        id: String(u.id),
+        name: u.name || 'admin',
+        role: u.role || 'CASHIER',
+        email: u.email || `${u.name}@flowpos.store`,
+        pin: String(u.pin || '1234'),
+        password: String(u.password || 'admin'),
+        avatar: u.avatar || '',
+        title: u.title || '',
+        is_active: u.is_active !== false,
+        updated_at: new Date().toISOString()
+      }));
+      supabaseClient.client.from('users').upsert(payload, { onConflict: 'id' }).then(({ error }) => {
+        if (error) console.warn('Online user sync error:', error.message);
+      }).catch(err => console.warn('Online user sync failed:', err));
     }
   }
 

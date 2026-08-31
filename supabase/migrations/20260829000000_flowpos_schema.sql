@@ -1,55 +1,50 @@
 -- ==========================================================
 -- FlowPOS Relational PostgreSQL Schema & Security Policies
--- Optimized for Offline-First Sync & Supabase Cloud
+-- Full Cloud Persistence for Staff Users, Passwords, PINs,
+-- Settings, Catalog, Sales, and Realtime Multi-Device Sync
 -- ==========================================================
 
--- Drop existing tables to refresh schema clean
+-- Drop existing tables to refresh clean
 DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS time_punches CASCADE;
+DROP TABLE IF EXISTS gift_cards CASCADE;
+DROP TABLE IF EXISTS promotions CASCADE;
+DROP TABLE IF EXISTS outlets CASCADE;
 DROP TABLE IF EXISTS register_sessions CASCADE;
 DROP TABLE IF EXISTS registers CASCADE;
-DROP TABLE IF EXISTS payments CASCADE;
-DROP TABLE IF EXISTS refunds CASCADE;
-DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
-DROP TABLE IF EXISTS loyalty_transactions CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
-DROP TABLE IF EXISTS purchase_order_items CASCADE;
-DROP TABLE IF EXISTS purchase_orders CASCADE;
 DROP TABLE IF EXISTS inventory_movements CASCADE;
-DROP TABLE IF EXISTS product_variants CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS suppliers CASCADE;
-DROP TABLE IF EXISTS brands CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
-DROP TABLE IF EXISTS role_permissions CASCADE;
-DROP TABLE IF EXISTS permissions CASCADE;
-DROP TABLE IF EXISTS roles CASCADE;
-DROP TABLE IF EXISTS locations CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS settings CASCADE;
 DROP TABLE IF EXISTS stores CASCADE;
 
--- 1. STORES & LOCATIONS
-CREATE TABLE IF NOT EXISTS stores (
+-- 1. USERS & STAFF CREDENTIALS (Admin, Cashiers, Passwords, 4-digit PINs)
+CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  legal_name VARCHAR(255),
-  tax_id VARCHAR(100),
-  phone VARCHAR(50),
+  role VARCHAR(50) NOT NULL DEFAULT 'CASHIER',
   email VARCHAR(255),
-  address TEXT,
-  city VARCHAR(100),
-  state VARCHAR(100),
-  zip_code VARCHAR(20),
-  country VARCHAR(100) DEFAULT 'USA',
-  currency VARCHAR(10) DEFAULT 'USD',
-  currency_symbol VARCHAR(10) DEFAULT '$',
-  receipt_header TEXT DEFAULT 'Welcome to FlowPOS Retail Store',
-  receipt_footer TEXT DEFAULT 'Thank you for shopping with us! Please keep your receipt for 30-day returns.',
+  pin VARCHAR(20) DEFAULT '1234',
+  password VARCHAR(255) DEFAULT 'admin',
+  avatar TEXT,
+  title VARCHAR(255),
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. CATEGORIES
+-- 2. STORE SETTINGS & BRANDING CONFIGURATION
+CREATE TABLE IF NOT EXISTS settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. CATEGORIES
 CREATE TABLE IF NOT EXISTS categories (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -62,7 +57,7 @@ CREATE TABLE IF NOT EXISTS categories (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. SUPPLIERS
+-- 4. SUPPLIERS
 CREATE TABLE IF NOT EXISTS suppliers (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -77,7 +72,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. PRODUCTS
+-- 5. PRODUCTS & CATALOG
 CREATE TABLE IF NOT EXISTS products (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -99,7 +94,7 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. CUSTOMERS
+-- 6. CUSTOMERS & LOYALTY
 CREATE TABLE IF NOT EXISTS customers (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -115,7 +110,7 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. ORDERS
+-- 7. ORDERS & SALES RECEIPTS
 CREATE TABLE IF NOT EXISTS orders (
   id VARCHAR(255) PRIMARY KEY,
   order_number VARCHAR(100),
@@ -131,7 +126,7 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. INVENTORY MOVEMENTS
+-- 8. INVENTORY MOVEMENTS
 CREATE TABLE IF NOT EXISTS inventory_movements (
   id VARCHAR(255) PRIMARY KEY,
   product_id VARCHAR(255) REFERENCES products(id) ON DELETE CASCADE,
@@ -146,51 +141,90 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 8. REGISTERS & SESSIONS
-CREATE TABLE IF NOT EXISTS registers (
+-- 9. PROMOTIONS & MARKETING
+CREATE TABLE IF NOT EXISTS promotions (
   id VARCHAR(255) PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) DEFAULT 'percentage',
+  value NUMERIC(12, 2) DEFAULT 0,
+  category_id VARCHAR(255),
+  min_order_amount NUMERIC(12, 2) DEFAULT 0,
+  min_items INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  badge VARCHAR(100),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10. GIFT CARDS & STORE CREDITS
+CREATE TABLE IF NOT EXISTS gift_cards (
+  id VARCHAR(255) PRIMARY KEY,
+  code VARCHAR(100) NOT NULL UNIQUE,
+  initial_balance NUMERIC(12, 2) NOT NULL,
+  current_balance NUMERIC(12, 2) NOT NULL,
+  customer_name VARCHAR(255),
+  customer_phone VARCHAR(50),
+  status VARCHAR(50) DEFAULT 'ACTIVE',
+  history JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+);
+
+-- 11. TIME CLOCK & SHIFT TIMESHEETS
+CREATE TABLE IF NOT EXISTS time_punches (
+  id VARCHAR(255) PRIMARY KEY,
+  employee_id VARCHAR(255),
+  employee_name VARCHAR(255),
+  role VARCHAR(50),
+  hourly_rate NUMERIC(12, 2) DEFAULT 0,
+  punch_in TIMESTAMPTZ NOT NULL,
+  punch_out TIMESTAMPTZ,
+  total_hours NUMERIC(8, 2),
+  status VARCHAR(50) DEFAULT 'ACTIVE',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 12. STORE OUTLETS
+CREATE TABLE IF NOT EXISTS outlets (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
   code VARCHAR(50),
+  address TEXT,
+  city VARCHAR(100),
+  phone VARCHAR(50),
+  is_warehouse BOOLEAN DEFAULT FALSE,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS register_sessions (
-  id VARCHAR(255) PRIMARY KEY,
-  register_id VARCHAR(255),
-  register_name VARCHAR(255),
-  user_id VARCHAR(255),
-  user_name VARCHAR(255),
-  opening_cash NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  total_cash_sales NUMERIC(12, 2) DEFAULT 0.00,
-  total_card_sales NUMERIC(12, 2) DEFAULT 0.00,
-  total_mobile_sales NUMERIC(12, 2) DEFAULT 0.00,
-  cash_in_total NUMERIC(12, 2) DEFAULT 0.00,
-  cash_out_total NUMERIC(12, 2) DEFAULT 0.00,
-  status VARCHAR(50) DEFAULT 'open',
-  notes TEXT,
-  opened_at TIMESTAMPTZ DEFAULT NOW(),
-  closed_at TIMESTAMPTZ
-);
-
--- 9. ENABLE ROW LEVEL SECURITY (RLS) WITH FULL CLIENT ACCESS
-ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
+-- ==========================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- Full client read & write access for anon & authenticated
+-- ==========================================================
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE register_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gift_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_punches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outlets ENABLE ROW LEVEL SECURITY;
 
--- Allow full read/write access for anon and authenticated API clients
-CREATE POLICY "Allow all stores" ON stores FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all users" ON users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all settings" ON settings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all categories" ON categories FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all suppliers" ON suppliers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all products" ON products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all customers" ON customers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all orders" ON orders FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all inventory_movements" ON inventory_movements FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all registers" ON registers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all register_sessions" ON register_sessions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all promotions" ON promotions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all gift_cards" ON gift_cards FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all time_punches" ON time_punches FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all outlets" ON outlets FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- Enable Supabase Realtime across all relevant POS tables
+ALTER PUBLICATION supabase_realtime ADD TABLE users, settings, products, categories, orders, customers;

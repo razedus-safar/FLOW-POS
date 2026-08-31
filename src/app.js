@@ -31,6 +31,7 @@ import { OutletsPage } from './pages/Outlets.js';
 import { NotFoundPage } from './pages/NotFound.js';
 import { CustomerDisplayPage } from './pages/CustomerDisplay.js';
 import { sessionManager } from './store/session.js';
+import { supabaseClient } from './services/supabase.js';
 import { sanitizeHtml } from './utils/security.js';
 
 const ROUTE_PERMISSIONS = {
@@ -79,6 +80,27 @@ export class App {
     window.addEventListener('hashchange', () => {
       this.render();
     });
+
+    // Auto-sync & Pull latest store data & staff credentials from Supabase
+    if (supabaseClient.isConfigured()) {
+      supabaseClient.pullFromCloud().then(res => {
+        if (res.success && (res.users > 0 || res.products > 0)) {
+          sessionManager.loadUsers();
+          if (this.currentPageInstance && typeof this.currentPageInstance.render === 'function') {
+            this.currentPageInstance.render();
+          }
+        }
+      });
+
+      supabaseClient.subscribeRealtime((table) => {
+        if (table === 'users') {
+          sessionManager.loadUsers();
+        }
+        if (this.currentPageInstance && typeof this.currentPageInstance.render === 'function') {
+          this.currentPageInstance.render();
+        }
+      });
+    }
 
     // Mobile Sidebar Drawer Toggle Event
     window.addEventListener('flowpos:toggle-mobile-sidebar', () => {
