@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils/currency.js';
 import { toast } from '../components/Toast.js';
 import { soundManager } from '../utils/audio.js';
 import { showConfirmDialog } from '../components/ConfirmDialog.js';
+import { sanitizeHtml } from '../utils/security.js';
 
 export class TimeClockPage {
   constructor(container) {
@@ -44,15 +45,19 @@ export class TimeClockPage {
         <button
           type="button"
           data-select-staff="${emp.id}"
-          class="p-3.5 rounded-[18px] text-left border transition-all ${isSelected ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30 bg-[var(--accent)]/10 shadow-md' : 'border-[var(--line)] glass-card hover:border-[var(--accent)]'}"
+          class="p-3 rounded-[16px] text-left transition-all duration-150 active:scale-98 select-none ${
+            isSelected 
+              ? 'border-2 border-[#0066CC] dark:border-[#38BDF8] bg-white dark:bg-slate-800 shadow-md ring-1 ring-[#0066CC]/20' 
+              : 'border border-[var(--line)] bg-white/70 dark:bg-white/[0.04] hover:bg-white dark:hover:bg-white/[0.08] hover:border-[var(--accent)]/50'
+          }"
         >
           <div class="flex items-center justify-between">
-            <span class="text-xs font-black text-[var(--text)] truncate">${emp.name}</span>
-            <span class="w-2.5 h-2.5 rounded-full ${isClockedIn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}"></span>
+            <span class="text-xs font-black text-[var(--text)] truncate">${sanitizeHtml(emp.name)}</span>
+            <span class="w-2.5 h-2.5 rounded-full ${isClockedIn ? 'bg-emerald-500 animate-pulse ring-2 ring-emerald-500/20' : 'bg-slate-400'} flex-shrink-0"></span>
           </div>
-          <div class="flex items-center justify-between mt-1 text-[10px] text-[var(--muted)]">
-            <span>${emp.role}</span>
-            <span class="${isClockedIn ? 'text-emerald-500 font-bold' : ''}">${isClockedIn ? 'On Shift' : 'Clocked Out'}</span>
+          <div class="flex items-center justify-between mt-1 text-[10.5px] text-[var(--muted)]">
+            <span class="truncate uppercase font-bold text-[9px] tracking-wider">${sanitizeHtml(emp.role)}</span>
+            <span class="${isClockedIn ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' : 'font-medium'}">${isClockedIn ? 'On Shift' : 'Clocked Out'}</span>
           </div>
         </button>
       `;
@@ -107,29 +112,32 @@ export class TimeClockPage {
 
             <!-- Staff Grid -->
             <div class="space-y-1.5">
-              <span class="text-[10px] font-bold text-[var(--muted)] uppercase">1. Select Staff Member</span>
-              <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto scrollbar-none">
+              <span class="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider">1. Select Staff Member</span>
+              <div class="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto px-1 py-1 scrollbar-thin">
                 ${staffGridHtml}
               </div>
             </div>
 
             <!-- PIN Display -->
             <div class="space-y-1.5 pt-2 border-t border-[var(--line)]">
-              <span class="text-[10px] font-bold text-[var(--muted)] uppercase">2. Enter 4-Digit Staff PIN</span>
-              <div class="h-11 rounded-[14px] glass-input flex items-center justify-center space-x-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider">2. Enter 4-Digit Staff PIN</span>
+                ${this.pinBuffer.length > 0 ? `<button type="button" id="clear-pin-text-btn" class="text-[10px] font-bold text-[var(--red)] hover:underline">Clear</button>` : ''}
+              </div>
+              <div class="h-10 rounded-[14px] glass-input flex items-center justify-center space-x-3 max-w-[280px] mx-auto">
                 ${[0, 1, 2, 3].map(idx => `
-                  <div class="w-3 h-3 rounded-full border border-[var(--accent)] ${this.pinBuffer.length > idx ? 'bg-[var(--accent)]' : ''}"></div>
+                  <div class="w-3 h-3 rounded-full border-2 border-[var(--accent)] transition-all ${this.pinBuffer.length > idx ? 'bg-[var(--accent)] scale-110 shadow-sm' : 'border-[var(--glass-border)]'}"></div>
                 `).join('')}
               </div>
             </div>
 
-            <!-- Numeric Pad -->
-            <div class="grid grid-cols-3 gap-2 pt-1 flex-1">
+            <!-- Apple Compact Numeric Pad -->
+            <div class="grid grid-cols-3 gap-2 pt-1 max-w-[280px] mx-auto w-full">
               ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, '✓'].map(btn => `
                 <button
                   type="button"
                   data-pin-key="${btn}"
-                  class="h-10 rounded-[12px] glass-btn-secondary text-sm font-black font-mono flex items-center justify-center hover:border-[var(--accent)] active:scale-95 transition"
+                  class="h-11 rounded-[14px] glass-btn-secondary text-base font-black font-mono flex items-center justify-center hover:border-[var(--accent)] active:scale-95 transition select-none ${btn === '✓' ? 'text-emerald-600 dark:text-emerald-400' : btn === 'C' ? 'text-red-500' : 'text-[var(--text)]'}"
                 >
                   ${btn}
                 </button>
@@ -137,13 +145,13 @@ export class TimeClockPage {
             </div>
 
             <!-- Action Button -->
-            <div class="pt-2">
+            <div class="pt-1 max-w-[280px] mx-auto w-full">
               <button
                 type="button"
                 id="submit-punch-btn"
-                class="w-full py-3 rounded-[16px] text-xs font-black text-white shadow-lg transition active:scale-96 ${activeShift ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'}"
+                class="w-full h-11 rounded-[14px] text-xs font-black text-white shadow-lg transition active:scale-96 flex items-center justify-center space-x-2 ${activeShift ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'}"
               >
-                ${activeShift ? '⏹ PUNCH OUT (End Shift)' : '▶ PUNCH IN (Start Shift)'}
+                <span>${activeShift ? '⏹ PUNCH OUT (End Shift)' : '▶ PUNCH IN (Start Shift)'}</span>
               </button>
             </div>
           </div>
@@ -226,6 +234,16 @@ export class TimeClockPage {
         this.attachEvents();
       });
     });
+
+    // Clear PIN text button
+    const clearPinTextBtn = this.container.querySelector('#clear-pin-text-btn');
+    if (clearPinTextBtn) {
+      clearPinTextBtn.addEventListener('click', () => {
+        this.pinBuffer = '';
+        this.render();
+        this.attachEvents();
+      });
+    }
 
     // Punch Submit Button
     const submitBtn = this.container.querySelector('#submit-punch-btn');

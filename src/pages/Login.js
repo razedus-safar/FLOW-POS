@@ -1,6 +1,9 @@
 /**
- * FlowPOS Secure Touch Authentication & Cashier PIN Pad Login View
- * Fully responsive for Mobile, Tablet, and Desktop POS Terminals with Operator Dropdown & Smart PIN Matching
+ * FlowPOS Apple iOS 26 Liquid Glass Authentication & Terminal Login View
+ * Ultra-refined responsive design:
+ * - Desktop (>= 768px): Sleek "Select Operator" Staff Cards on the Left, Touch Keypad on the Right (No dropdown)
+ * - Mobile (< 768px): Clean Native Operator Dropdown Picker (No cards on mobile)
+ * - Pixel-perfect match with Apple Liquid Glass specifications & zero password hints
  */
 
 import { sessionManager } from '../store/session.js';
@@ -67,7 +70,7 @@ export class LoginPage {
 
   render() {
     const users = sessionManager.getAllUsers();
-    const selectedUser = users.find(u => u.id === this.selectedUserId) || users[0] || { id: 'usr-admin', name: 'Admin', role: 'OWNER' };
+    const selectedUser = users.find(u => u.id === this.selectedUserId) || users[0] || { id: 'usr-admin', name: 'admin', role: 'OWNER' };
     if (!this.selectedUserId && selectedUser) {
       this.selectedUserId = selectedUser.id;
     }
@@ -76,32 +79,47 @@ export class LoginPage {
     const store = settings?.store || {};
     const storeName = store.name || 'FlowPOS Store';
     const storeTagline = store.tagline || 'Retail Operating Station';
-    const storeLogo = store.logo || '';
     const currentTheme = themeManager.getTheme();
 
     const lockInfo = loginRateLimiter.isLocked();
 
-    // Staff Quick Selection for Desktop (Vertical List)
-    const staffQuickCardsHtml = users.map(u => {
+    // Desktop Visual Operator Cards List
+    const desktopStaffCardsHtml = users.map(u => {
       const isSelected = u.id === selectedUser.id;
+      const initials = (u.name || 'ST').substring(0, 2).toUpperCase();
+      const roleUpper = (u.role || 'CASHIER').toUpperCase();
+
+      let badgeClasses = 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+      if (roleUpper === 'OWNER') {
+        badgeClasses = 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/30';
+      } else if (roleUpper === 'MANAGER') {
+        badgeClasses = 'text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/30';
+      } else if (roleUpper === 'INVENTORY') {
+        badgeClasses = 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30';
+      }
+
       return `
         <button
           type="button"
           data-select-user-id="${u.id}"
-          class="w-full flex items-center justify-between p-3 rounded-[18px] glass-card transition-all duration-150 text-left active:scale-98 select-none ${isSelected ? 'ring-2 ring-[var(--accent)] bg-white dark:bg-slate-800 shadow-md' : 'hover:bg-white/80 dark:hover:bg-slate-800/80'}"
+          class="w-full flex items-center justify-between px-3.5 py-3 rounded-[20px] transition-all duration-150 text-left active:scale-98 select-none ${
+            isSelected 
+              ? 'border-2 border-[#0066CC] dark:border-[#38BDF8] bg-white dark:bg-slate-800 shadow-md ring-1 ring-[#0066CC]/20' 
+              : 'border border-[var(--line)] bg-white/80 dark:bg-white/[0.04] hover:bg-white dark:hover:bg-white/[0.08] hover:border-[var(--accent)]/50'
+          }"
         >
-          <div class="flex items-center space-x-3 min-w-0">
-            <div class="avatar w-10 h-10 rounded-[12px] bg-gradient-to-tr from-[#0066CC] to-[#7E22CE] text-white font-bold text-xs grid place-items-center flex-shrink-0 shadow-xs">
-              ${sanitizeHtml(u.name.substring(0, 2).toUpperCase())}
+          <div class="flex items-center space-x-3.5 min-w-0">
+            <div class="avatar w-10 h-10 rounded-[13px] bg-gradient-to-tr from-[#3b52d4] to-[#6930c3] text-white font-black text-xs grid place-items-center flex-shrink-0 shadow-sm">
+              ${sanitizeHtml(initials)}
             </div>
             <div class="truncate">
-              <h4 class="text-xs font-bold text-[var(--text)] truncate">${sanitizeHtml(u.name)}</h4>
-              <p class="text-[10px] text-[var(--muted)] font-medium mt-0.5 truncate">${sanitizeHtml(u.title || u.role)}</p>
+              <h4 class="text-sm font-extrabold text-[var(--text)] tracking-tight truncate">${sanitizeHtml(u.name)}</h4>
+              <p class="text-[11px] text-[var(--muted)] font-medium mt-0.5 truncate">${sanitizeHtml(u.title || u.role)}</p>
             </div>
           </div>
           <div class="text-right flex-shrink-0 pl-2">
-            <span class="badge ${u.role === 'OWNER' ? 'badge-platinum' : u.role === 'MANAGER' ? 'badge-blue' : u.role === 'INVENTORY' ? 'badge-amber' : 'badge-emerald'} text-[9px]">
-              ${sanitizeHtml(u.role)}
+            <span class="inline-block px-3 py-0.5 text-[10px] font-black tracking-wider uppercase border rounded-full ${badgeClasses}">
+              ${sanitizeHtml(roleUpper)}
             </span>
           </div>
         </button>
@@ -109,34 +127,38 @@ export class LoginPage {
     }).join('');
 
     const pinDotsHtml = [0, 1, 2, 3].map(idx => `
-      <div class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-[var(--accent)] flex items-center justify-center transition-all duration-150 ${this.pinBuffer.length > idx ? 'bg-[var(--accent)] scale-125 shadow-md shadow-[var(--accent)]/40' : 'bg-[var(--glass-bg-clear)]'}"></div>
+      <div class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-[var(--accent)] flex items-center justify-center transition-all duration-200 ${
+        this.pinBuffer.length > idx 
+          ? 'bg-[var(--accent)] scale-125 shadow-lg shadow-[var(--accent)]/50' 
+          : 'bg-black/5 dark:bg-white/10 border-[var(--glass-border)]'
+      }"></div>
     `).join('');
 
     const lockoutBannerHtml = lockInfo.locked ? `
-      <div class="p-3 rounded-[16px] bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-between animate-pulse mb-3">
+      <div class="p-3.5 rounded-[18px] bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-between animate-pulse mb-3.5">
         <span>⚠️ Terminal locked for ${lockInfo.remainingSeconds}s.</span>
-        <button type="button" id="reset-lockout-btn" class="px-2 py-1 rounded-[8px] bg-red-600 text-white font-bold text-[10px] hover:bg-red-700 active:scale-95 transition">
+        <button type="button" id="reset-lockout-btn" class="px-2.5 py-1 rounded-[10px] bg-red-600 text-white font-black text-[11px] hover:bg-red-700 active:scale-95 transition">
           Unlock Now
         </button>
       </div>
     ` : '';
 
     this.container.innerHTML = `
-      <div class="w-full min-h-[100dvh] flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 overflow-y-auto overscroll-contain">
+      <div class="w-full min-h-[100dvh] flex flex-col items-center justify-start sm:justify-center p-3.5 sm:p-6 py-6 sm:py-10 overflow-y-auto overscroll-contain">
         
-        <!-- Top Theme Switcher Bar -->
+        <!-- Apple Liquid Glass Top Navigation Bar -->
         <div class="w-full max-w-4xl flex items-center justify-between mb-3 px-2 z-20 flex-shrink-0">
-          <div class="flex items-center space-x-2 text-xs font-semibold text-[var(--muted)]">
+          <div class="flex items-center space-x-2 text-xs font-bold text-[var(--muted)]">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Terminal Station Ready</span>
           </div>
 
-          <!-- Theme Toggle Switcher -->
-          <div class="flex items-center p-1 rounded-full bg-[var(--card-bg)] border border-[var(--line)] shadow-xs">
+          <!-- Apple Segmented Theme Switcher -->
+          <div class="flex items-center p-1 rounded-full bg-white/50 dark:bg-black/40 backdrop-blur-xl border border-[var(--line)] shadow-xs">
             <button
               type="button"
               data-login-theme="light"
-              class="px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'light' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
+              class="px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'light' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
               title="Light Theme"
             >
               ${renderIcon('sun', 'w-3.5 h-3.5')}
@@ -145,7 +167,7 @@ export class LoginPage {
             <button
               type="button"
               data-login-theme="dark"
-              class="px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'dark' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
+              class="px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'dark' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
               title="Dark Theme"
             >
               ${renderIcon('moon', 'w-3.5 h-3.5')}
@@ -154,7 +176,7 @@ export class LoginPage {
             <button
               type="button"
               data-login-theme="system"
-              class="px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'system' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
+              class="px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 ${currentTheme === 'system' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}"
               title="System Theme"
             >
               ${renderIcon('laptop', 'w-3.5 h-3.5')}
@@ -163,78 +185,71 @@ export class LoginPage {
           </div>
         </div>
 
-        <!-- Main Login Card -->
-        <div class="relative w-full max-w-4xl glass2 rounded-[28px] sm:rounded-[32px] border border-[var(--line)] shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 z-10 my-auto">
+        <!-- Apple Glass Master Container (Desktop: Flex Row, Mobile: Flex Column) -->
+        <div class="relative w-full max-w-4xl glass2 rounded-[32px] sm:rounded-[36px] border border-[var(--glass-border)] shadow-2xl overflow-hidden flex flex-col md:flex-row z-10 my-auto backdrop-blur-2xl">
           
-          <!-- Left Column / Top Section: Branding & Touch Staff Selector -->
-          <div class="lg:col-span-5 p-4 sm:p-6 lg:p-7 glass border-b lg:border-b-0 lg:border-r border-[var(--line)] flex flex-col justify-between space-y-4">
+          <!-- LEFT COLUMN (DESKTOP: "Select Operator" Staff Cards List) -->
+          <div class="login-desktop-panel p-6 lg:p-7 glass border-r border-[var(--line)] flex flex-col justify-between space-y-4">
             <div>
-              <!-- Store Logo & Name -->
-              <div class="flex items-center space-x-3">
-                <div class="logo w-11 h-11 sm:w-12 sm:h-12 rounded-[16px] bg-gradient-to-tr from-[#0066CC] to-[#7E22CE] text-white font-bold text-xl sm:text-2xl flex items-center justify-center shadow-md flex-shrink-0 overflow-hidden border border-[var(--line)]">
-                  ${storeLogo ? `
-                    <img
-                      src="${storeLogo}"
-                      alt="${storeName}"
-                      class="w-full h-full object-cover"
-                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                    />
-                    <div class="w-full h-full hidden items-center justify-center font-bold text-xl">
-                      ${storeName.substring(0, 1).toUpperCase()}
-                    </div>
-                  ` : `
-                    <span>${storeName.substring(0, 1).toUpperCase()}</span>
-                  `}
-                </div>
-                <div class="min-w-0">
-                  <h1 class="font-heading font-black text-lg sm:text-xl tracking-tight text-[var(--text)] truncate">${storeName}</h1>
-                  <p class="text-[9.5px] uppercase tracking-wider font-bold text-[var(--accent)] truncate">${storeTagline}</p>
-                </div>
+              <!-- Desktop Operator Heading -->
+              <div class="space-y-1">
+                <h2 class="text-base font-black font-heading text-[var(--text)]">Select Operator</h2>
+                <p class="text-xs text-[var(--muted)] font-medium">Pick your profile or type your 4-digit PIN.</p>
               </div>
 
-              <!-- Desktop Touch Staff List -->
-              <div class="mt-5 space-y-1">
-                <h2 class="text-sm font-bold font-heading text-[var(--text)]">Select Operator</h2>
-                <p class="text-[11px] text-[var(--muted)] font-medium">Pick your profile or type your 4-digit PIN.</p>
-                
-                <div class="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-none">
-                  ${staffQuickCardsHtml}
-                </div>
+              <!-- Desktop Staff List Cards -->
+              <div class="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto px-1 py-1 scrollbar-none">
+                ${desktopStaffCardsHtml}
               </div>
             </div>
 
-            <!-- Terminal Security Notice -->
-            <div class="p-3 rounded-[16px] glass-card flex items-center space-x-2.5 text-xs text-[var(--muted)]">
+            <!-- Terminal Encryption Status -->
+            <div class="p-3 rounded-[16px] glass-card flex items-center space-x-2.5 text-xs text-[var(--muted)] border border-[var(--line)]">
               <span class="text-[var(--accent)] text-base flex-shrink-0">🔒</span>
-              <p class="text-[10.5px] leading-tight">Enterprise Encrypted Session &bull; Fast PIN Verification</p>
+              <p class="text-[11px] leading-snug font-medium">Enterprise Encrypted Session &bull; Fast Touch PIN</p>
             </div>
           </div>
 
-          <!-- Right Column: Touch PIN Numpad or Credentials Form -->
-          <div class="lg:col-span-7 p-4 sm:p-6 lg:p-7 flex flex-col justify-center space-y-4 sm:space-y-5">
+          <!-- RIGHT COLUMN (DESKTOP & MOBILE: Touch Keypad / Mobile Dropdown) -->
+          <div class="login-keypad-panel p-5 sm:p-7 flex flex-col justify-center space-y-4 sm:space-y-5">
+            
+            <!-- Mobile Brand Header (Visible ONLY on Mobile Phones) -->
+            <div class="login-mobile-only pb-3 border-b border-[var(--line)]">
+              <div class="flex items-center space-x-3">
+                <div class="logo w-10 h-10 rounded-[14px] bg-gradient-to-tr from-[#0066CC] to-[#7E22CE] text-white font-black text-lg flex items-center justify-center shadow-md flex-shrink-0">
+                  <span>${storeName.substring(0, 1).toUpperCase()}</span>
+                </div>
+                <div class="min-w-0">
+                  <h1 class="font-heading font-black text-base tracking-tight text-[var(--text)] truncate">${storeName}</h1>
+                  <p class="text-[9.5px] uppercase tracking-wider font-extrabold text-[var(--accent)] truncate">${storeTagline}</p>
+                </div>
+              </div>
+            </div>
+
             ${lockoutBannerHtml}
 
-            <!-- Mode Switcher Tabs -->
-            <div class="flex items-center p-1 rounded-[14px] bg-[var(--glass-bg-clear)] border border-[var(--line)] shadow-xs">
-              <button id="tab-pin-mode" class="flex-1 py-2 sm:py-2.5 rounded-[11px] text-xs font-bold transition-all ${this.mode === 'pin' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}">
+            <!-- Apple Segmented Mode Switcher -->
+            <div class="flex items-center p-1 rounded-[16px] bg-black/5 dark:bg-white/5 border border-[var(--line)] shadow-xs">
+              <button id="tab-pin-mode" class="flex-1 py-2.5 rounded-[12px] text-xs font-extrabold transition-all duration-200 ${this.mode === 'pin' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}">
                 Touch PIN Pad
               </button>
-              <button id="tab-email-mode" class="flex-1 py-2 sm:py-2.5 rounded-[11px] text-xs font-bold transition-all ${this.mode === 'email' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}">
+              <button id="tab-email-mode" class="flex-1 py-2.5 rounded-[12px] text-xs font-extrabold transition-all duration-200 ${this.mode === 'email' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--text)]'}">
                 Username / Password
               </button>
             </div>
 
-            <!-- PIN Numpad Mode -->
+            <!-- PIN NUMPAD MODE -->
             ${this.mode === 'pin' ? `
-              <div class="space-y-3 sm:space-y-4">
-                <!-- Operator Dropdown Picker (Available on All Screen Sizes) -->
-                <div class="space-y-1.5">
-                  <label class="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider text-center">Active Operator</label>
-                  <div class="relative flex items-center max-w-[320px] mx-auto">
-                    <select id="operator-select-dropdown" class="w-full h-11 pl-3.5 pr-10 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] bg-[var(--card-bg)] border border-[var(--line)] shadow-xs appearance-none cursor-pointer">
+              <div class="space-y-3.5 sm:space-y-4">
+                
+                <!-- MOBILE ONLY: Operator Dropdown Picker (Hidden on Desktop) -->
+                <div class="login-mobile-only space-y-1.5">
+                  <label class="block text-[11px] font-black text-[var(--muted)] uppercase tracking-wider">Select Active Operator</label>
+                  <div class="relative flex items-center">
+                    <select id="mobile-operator-select" class="w-full h-11 pl-3.5 pr-10 rounded-[16px] glass-input text-xs font-bold text-[var(--text)] bg-[var(--card-bg)] border border-[var(--line)] shadow-xs appearance-none cursor-pointer">
                       ${users.map(u => `
                         <option value="${u.id}" ${u.id === selectedUser.id ? 'selected' : ''}>
-                          ${sanitizeHtml(u.name)} — ${u.role} ${u.role === 'OWNER' ? '★ (Admin)' : ''}
+                          ${sanitizeHtml(u.name)} — ${u.role} ${u.role === 'OWNER' ? '★' : ''}
                         </option>
                       `).join('')}
                     </select>
@@ -242,56 +257,78 @@ export class LoginPage {
                   </div>
                 </div>
 
-                <div class="text-center space-y-1">
-                  <p class="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Enter 4-Digit Security PIN</p>
-                  <div class="flex items-center justify-center space-x-3.5 py-1">
+                <!-- Active Operator Info Pill -->
+                <div class="text-center space-y-1.5">
+                  <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/50 dark:bg-white/[0.05] border border-[var(--line)] shadow-xs">
+                    <span class="text-[11px] text-[var(--muted)] font-medium">Operator:</span>
+                    <strong class="text-xs font-extrabold text-[var(--text)]">${selectedUser ? selectedUser.name : 'Staff'}</strong>
+                    <span class="badge ${selectedUser?.role === 'OWNER' ? 'badge-platinum' : selectedUser?.role === 'MANAGER' ? 'badge-blue' : selectedUser?.role === 'INVENTORY' ? 'badge-amber' : 'badge-emerald'} text-[8px] px-1.5 py-0.2">
+                      ${selectedUser?.role || 'STAFF'}
+                    </span>
+                  </div>
+                  
+                  <p class="text-[10.5px] font-extrabold text-[var(--muted)] uppercase tracking-widest block pt-0.5">Enter 4-Digit Security PIN</p>
+                  
+                  <!-- PIN Dots Indicator -->
+                  <div class="flex items-center justify-center space-x-4 py-1.5">
                     ${pinDotsHtml}
                   </div>
                 </div>
 
-                <!-- Touch-Optimized Numpad Grid -->
-                <div class="grid grid-cols-3 gap-2 sm:gap-2.5 max-w-[280px] sm:max-w-[300px] mx-auto">
+                <!-- Apple Style Touch Keypad -->
+                <div class="grid grid-cols-3 gap-2.5 sm:gap-3 max-w-[290px] sm:max-w-[310px] mx-auto">
                   ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => `
-                    <button type="button" data-pin-num="${num}" class="h-12 sm:h-14 lg:h-15 rounded-[16px] sm:rounded-[18px] text-xl sm:text-2xl font-black font-mono glass-btn-secondary text-[var(--text)] flex items-center justify-center shadow-xs hover:border-[var(--accent)] active:scale-92 transition-all select-none">
+                    <button 
+                      type="button" 
+                      data-pin-num="${num}" 
+                      class="h-13 sm:h-15 rounded-[20px] text-2xl font-black font-mono glass-btn-secondary text-[var(--text)] flex items-center justify-center shadow-xs hover:border-[var(--accent)] active:scale-92 active:bg-[var(--accent)] active:text-white transition-all duration-150 select-none"
+                    >
                       ${num}
                     </button>
                   `).join('')}
-                  <button type="button" id="pin-clear-btn" class="h-12 sm:h-14 lg:h-15 rounded-[16px] sm:rounded-[18px] text-[11px] font-black glass-btn-secondary text-[var(--red)] flex items-center justify-center shadow-xs active:scale-92 transition-all select-none">
+                  <button 
+                    type="button" 
+                    id="pin-clear-btn" 
+                    class="h-13 sm:h-15 rounded-[20px] text-xs font-black glass-btn-secondary text-[var(--red)] flex items-center justify-center shadow-xs active:scale-92 transition-all duration-150 select-none"
+                  >
                     CLEAR
                   </button>
-                  <button type="button" data-pin-num="0" class="h-12 sm:h-14 lg:h-15 rounded-[16px] sm:rounded-[18px] text-xl sm:text-2xl font-black font-mono glass-btn-secondary text-[var(--text)] flex items-center justify-center shadow-xs hover:border-[var(--accent)] active:scale-92 transition-all select-none">
+                  <button 
+                    type="button" 
+                    data-pin-num="0" 
+                    class="h-13 sm:h-15 rounded-[20px] text-2xl font-black font-mono glass-btn-secondary text-[var(--text)] flex items-center justify-center shadow-xs hover:border-[var(--accent)] active:scale-92 active:bg-[var(--accent)] active:text-white transition-all duration-150 select-none"
+                  >
                     0
                   </button>
-                  <button type="button" id="pin-backspace-btn" class="h-12 sm:h-14 lg:h-15 rounded-[16px] sm:rounded-[18px] text-xs font-bold glass-btn-secondary text-[var(--accent)] flex items-center justify-center shadow-xs active:scale-92 transition-all select-none">
+                  <button 
+                    type="button" 
+                    id="pin-backspace-btn" 
+                    class="h-13 sm:h-15 rounded-[20px] text-xs font-bold glass-btn-secondary text-[var(--accent)] flex items-center justify-center shadow-xs active:scale-92 transition-all duration-150 select-none"
+                    title="Backspace"
+                  >
                     ${renderIcon('trash-2', 'w-4 h-4')}
                   </button>
                 </div>
-
-                <div class="text-center pt-1">
-                  <p class="text-[10px] text-[var(--muted)] font-mono">
-                    Admin: <strong class="text-[var(--accent)]">1234</strong> &bull; Marcus: <strong class="text-[var(--text)]">2345</strong> &bull; Sophia: <strong class="text-[var(--text)]">3456</strong>
-                  </p>
-                </div>
               </div>
             ` : `
-              <!-- Email / Password Form Mode -->
-              <form id="email-login-form" class="space-y-3.5 max-w-sm mx-auto w-full" autocomplete="on">
+              <!-- USERNAME / PASSWORD FORM MODE -->
+              <form id="email-login-form" class="space-y-4 max-w-sm mx-auto w-full pt-1" autocomplete="on">
                 <div>
-                  <label class="block text-xs font-bold text-[var(--text)] mb-1">Username or Email</label>
+                  <label class="block text-xs font-extrabold text-[var(--text)] mb-1">Username or Email</label>
                   <input
                     id="login-username-input"
                     name="email"
                     type="text"
                     required
                     value="${selectedUser.email || selectedUser.name || 'admin'}"
-                    placeholder="Enter username (e.g. admin)"
+                    placeholder="Enter username"
                     autocomplete="username"
-                    class="w-full h-11 px-3.5 rounded-[12px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
+                    class="w-full h-12 px-4 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
                   />
                 </div>
 
                 <div>
-                  <label class="block text-xs font-bold text-[var(--text)] mb-1">Security Password</label>
+                  <label class="block text-xs font-extrabold text-[var(--text)] mb-1">Security Password</label>
                   <div class="relative flex items-center">
                     <input
                       id="login-password-input"
@@ -299,15 +336,15 @@ export class LoginPage {
                       type="${this.showPassword ? 'text' : 'password'}"
                       required
                       value=""
-                      placeholder="Enter password (e.g. admin)"
+                      placeholder="Enter password"
                       autocomplete="current-password"
-                      class="w-full h-11 pl-3.5 pr-11 rounded-[12px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
+                      class="w-full h-12 pl-4 pr-12 rounded-[14px] glass-input text-xs font-bold text-[var(--text)] placeholder:text-[var(--muted)]/60"
                     />
                     <button
                       type="button"
                       id="toggle-login-password-btn"
                       aria-label="Toggle password visibility"
-                      class="absolute right-1.5 p-1.5 rounded-[8px] text-[var(--muted)] hover:text-[var(--text)] transition active:scale-90"
+                      class="absolute right-2 p-2 rounded-[10px] text-[var(--muted)] hover:text-[var(--text)] transition active:scale-90"
                       title="${this.showPassword ? 'Hide password' : 'Show password'}"
                     >
                       ${renderIcon(this.showPassword ? 'eye-off' : 'eye', 'w-4 h-4')}
@@ -317,17 +354,11 @@ export class LoginPage {
 
                 <button
                   type="submit"
-                  class="w-full h-11 mt-2 rounded-[14px] glass-btn-primary text-xs font-black shadow-md flex items-center justify-center space-x-2 active:scale-98 transition-all"
+                  class="w-full h-12 mt-3 rounded-[16px] glass-btn-primary text-xs font-black shadow-lg flex items-center justify-center space-x-2 active:scale-98 transition-all"
                 >
                   <span>Unlock Terminal</span>
                   <span>→</span>
                 </button>
-
-                <div class="text-center pt-1">
-                  <p class="text-[10px] text-[var(--muted)] font-mono">
-                    Default: Username <strong class="text-[var(--accent)]">admin</strong> &bull; Password <strong class="text-[var(--accent)]">admin</strong>
-                  </p>
-                </div>
               </form>
             `}
           </div>
@@ -356,10 +387,10 @@ export class LoginPage {
       });
     }
 
-    // Operator Dropdown Select (All Viewports)
-    const operatorSelect = this.container.querySelector('#operator-select-dropdown');
-    if (operatorSelect) {
-      operatorSelect.addEventListener('change', (e) => {
+    // Mobile Operator Dropdown (Mobile Only)
+    const mobileSelect = this.container.querySelector('#mobile-operator-select');
+    if (mobileSelect) {
+      mobileSelect.addEventListener('change', (e) => {
         this.selectedUserId = e.target.value;
         this.pinBuffer = '';
         this.render();
@@ -367,7 +398,7 @@ export class LoginPage {
       });
     }
 
-    // Staff selector buttons (Desktop Cards)
+    // Desktop Staff Selector Cards (Desktop Only)
     this.container.querySelectorAll('[data-select-user-id]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.selectedUserId = btn.getAttribute('data-select-user-id');

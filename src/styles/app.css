@@ -434,7 +434,42 @@ kbd, .kbd-shortcut {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Force Hidden Utility */
-.hidden {
-  display: none !important;
+/* Dedicated Responsive Login Screen Layout */
+.login-desktop-panel {
+  display: none;
+}
+.login-mobile-only {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .login-desktop-panel {
+    display: flex !important;
+    width: 48%;
+    min-width: 360px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+  .login-keypad-panel {
+    width: 52%;
+    flex: 1;
+    box-sizing: border-box;
+  }
+  .login-mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .login-desktop-panel {
+    display: none !important;
+  }
+  .login-keypad-panel {
+    width: 100%;
+    flex: 1;
+    box-sizing: border-box;
+  }
+  .login-mobile-only {
+    display: block !important;
+  }
 }
